@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#08090d" />
+  <title>Stickman Gun Tower — Breakpoint</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main id="game-shell" aria-label="Stickman Gun Tower game">
+    <canvas id="game" width="1280" height="720" aria-label="Gameplay arena"></canvas>
+
+    <div id="hud" class="in-game-only">
+      <div id="topbar">
+        <span id="floorLabel">Floor 1</span>
+        <span id="missionLabel">Mission: clear the floor</span>
+        <span id="timerLabel">00:00.00</span>
+        <button id="pauseButton" type="button" aria-pressed="false">Pause</button>
+      </div>
+      <div id="controls">
+        <h2>COMBAT CONTROLS</h2>
+        <div><kbd>A / D</kbd><span>Move</span></div>
+        <div><kbd>W / S</kbd><span>Float up / down</span></div>
+        <div><kbd id="aimKeyHint">Mouse</kbd><span id="aimHint">Aim with the cursor</span></div>
+        <div id="weaponSelectControl"><kbd id="weaponKeysHint">1 / 2 / 3</kbd><span id="weaponSelectHint">Equip rifle / SMG / cannon</span></div>
+        <div id="mouseFireControl"><kbd>Left click</kbd><span>Hold to fire equipped weapon</span></div>
+        <div id="classicFireControl" class="hidden"><kbd>J</kbd><span>Hold to fire equipped weapon</span></div>
+        <div><kbd>WEAPON</kbd><span id="weaponLabel">Pistol</span></div>
+        <div><kbd id="rocketKeyHint">Right click</kbd><span>Fire a rocket (1 per pickup)</span></div>
+        <div><kbd id="dashKeyHint">K</kbd><span>Dash</span></div>
+        <div><kbd id="pauseKeyHint">P / ESC</kbd><span>Pause</span></div>
+        <div><kbd>R</kbd><span>Restart run</span></div>
+        <div class="control-tip"><span class="control-dot"></span><span>Weapon pickups respawn randomly; Rifle +15, SMG +30, Heavy +3</span></div>
+        <div class="control-tip"><span class="control-dot"></span><span>Rocket pickups add 1 explosive rocket</span></div>
+        <div class="control-tip"><span class="control-dot heal-dot"></span><span>Collect medkits to restore HP</span></div>
+      </div>
+      <div id="statusText">Choose a mode and deploy.</div>
+      <section id="tutorialPanel" class="tutorial-panel hidden" aria-live="polite" aria-labelledby="tutorialTitle">
+        <p id="tutorialProgress" class="eyebrow">TUTORIAL // LESSON 1</p>
+        <h2 id="tutorialTitle">MOVEMENT & FLOATING</h2>
+        <p id="tutorialDetail"></p>
+        <div class="tutorial-actions">
+          <button id="tutorialPrevious" type="button">← PREVIOUS</button>
+          <button id="tutorialNext" class="action-button action-primary" type="button">NEXT LESSON →</button>
+          <button id="tutorialExit" type="button">EXIT TUTORIAL</button>
+        </div>
+      </section>
+      <div id="touchControls" class="touch-controls hidden" aria-label="Touch controls">
+        <div class="touch-stick touch-move-stick" data-stick="move" aria-label="Movement joystick"><span></span><b>MOVE</b></div>
+        <div class="touch-aim-cluster">
+          <button class="touch-dash-button" type="button" data-touch-action="dash" aria-label="Dash">DASH</button>
+          <div class="touch-stick touch-aim-stick" data-stick="aim" aria-label="Aim joystick"><span></span><b>AIM</b></div>
+          <button class="touch-rocket-button" type="button" data-touch-action="rocket" aria-label="Fire rocket">ROCKET</button>
+        </div>
+      </div>
+    </div>
+
+    <section id="mainMenu" class="screen-panel" aria-labelledby="gameTitle">
+      <div class="menu-noise"></div>
+      <div class="menu-topline"><span class="live-dot"></span> SYSTEM ALERT // HOSTILE TOWER DETECTED <span class="topline-right">BUILD 0.9.6</span></div>
+      <div class="menu-layout">
+        <div class="menu-copy">
+          <p class="eyebrow">COMBAT SIMULATION // OPERATOR 01</p>
+          <h1 id="gameTitle">STICKMAN<br><span>GUN TOWER</span></h1>
+          <p class="menu-description">Breach eleven hostile floors. Adapt your loadout in combat, survive the crossfire, and set a new clear-time record.</p>
+          <div class="menu-actions">
+            <button id="playButton" class="action-button action-primary" type="button"><span>▶</span> DEPLOY NOW</button>
+            <button id="howToButton" class="action-button action-secondary" type="button">HOW TO PLAY <span>↗</span></button>
+          </div>
+          <label class="menu-control-preset" for="controlSchemeSelect"><span>CONTROL PRESET</span><select id="controlSchemeSelect"><option value="mouse">Mouse / Number Keys</option><option value="classic">Keyboard Aim / J-K-L</option><option value="touch">Touch Screen</option></select></label>
+      <div class="menu-stats">
+            <div><strong id="bestScore">000000</strong><span id="bestScoreLabel">TOWER BEST</span></div>
+            <div><strong>11</strong><span>TOWER FLOORS</span></div>
+            <div><strong id="bestClearTime">--:--.--</strong><span>BEST CLEAR</span></div>
+          </div>
+          <button id="settingsButton" class="text-button" type="button">SETTINGS</button>
+          <button id="recordsButton" class="text-button" type="button">RECORDS & CHALLENGE</button>
+        </div>
+        <div class="hero-scene" aria-hidden="true">
+          <div class="warning-stamp">DANGER<br><b>LEVEL 11</b></div>
+          <div class="crosshair crosshair-one">+</div><div class="crosshair crosshair-two">+</div>
+          <div class="hero-glow"></div>
+          <div class="hero-stickman"><i class="hero-head"></i><i class="hero-body"></i><i class="hero-arm hero-arm-back"></i><i class="hero-arm hero-arm-front"></i><i class="hero-leg hero-leg-back"></i><i class="hero-leg hero-leg-front"></i><i class="hero-gun"></i><i class="hero-muzzle"></i></div>
+          <div class="impact impact-one"></div><div class="impact impact-two"></div>
+          <div class="hero-caption">OPERATOR 01 <span>// READY FOR DEPLOYMENT</span></div>
+          <div class="hero-floor floor-a"></div><div class="hero-floor floor-b"></div><div class="hero-floor floor-c"></div>
+        </div>
+      </div>
+      <div class="menu-bottomline"><span>W / S TO FLOAT</span><span>A / D TO MOVE</span><span id="menuWeaponHint">1 / 2 / 3 EQUIP // LEFT CLICK FIRE</span><span id="menuFireHint">SPACE DASH // RIGHT CLICK ROCKET</span><span class="bottom-warning">⚠ EXPECT HEAVY RESISTANCE</span></div>
+    </section>
+
+    <section id="loadoutPanel" class="dialog-panel loadout-panel hidden" aria-labelledby="loadoutTitle">
+      <div class="dialog-top"><span class="eyebrow">DEPLOYMENT PROTOCOL // 01</span><button class="close-button" data-close="loadoutPanel" aria-label="Close deployment">×</button></div>
+      <h2 id="loadoutTitle">SELECT MISSION</h2>
+      <p class="dialog-subtitle">Choose your operation. Weapons are acquired in the field.</p>
+      <div class="choice-label">OPERATION</div>
+      <div class="choice-grid mode-grid">
+        <button class="choice-card selected" data-mode="tower" type="button"><span class="choice-icon">01</span><strong>TOWER BREACH</strong><small>Clear all eleven floors.</small><em>CAMPAIGN // FIXED OBJECTIVE</em></button>
+        <button class="choice-card" data-mode="survival" type="button"><span class="choice-icon">∞</span><strong>ENDLESS SURVIVAL</strong><small>Hold out against escalating waves.</small><em>ENDLESS // HIGH SCORE</em></button>
+      </div>
+      <label class="setting-row hidden" id="towerDifficultyRow"><span><strong>TOWER THREAT LEVEL</strong><small>Choose enemy speed, strength, and numbers</small></span><select id="towerDifficultySelect"><option value="easy">EASY</option><option value="normal">NORMAL</option><option value="hard">HARD</option></select></label>
+      <div id="settingsRows" class="hidden"><label class="setting-row"><span><strong>SOUND</strong><small>Combat and menu sound effects</small></span><input id="soundToggle" type="checkbox" checked></label><label class="setting-row"><span><strong>SCREEN SHAKE</strong><small>Impact camera feedback</small></span><input id="shakeToggle" type="checkbox" checked></label></div>
+      <div class="dialog-footer"><span id="loadoutSummary">TOWER BREACH / WEAPONS IN FIELD</span><button id="confirmDeploy" class="action-button action-primary" type="button">INITIATE DEPLOYMENT →</button></div>
+    </section>
+
+    <section id="helpPanel" class="dialog-panel narrow-panel hidden" aria-labelledby="helpTitle">
+      <div class="dialog-top"><span class="eyebrow">FIELD MANUAL</span><button class="close-button" data-close="helpPanel" aria-label="Close help">×</button></div>
+      <h2 id="helpTitle">HOW TO SURVIVE</h2>
+      <div class="help-list"><p><kbd>A / D</kbd> Move horizontally</p><p><kbd>W / S</kbd> Float up / down</p><p id="helpMouseAim"><kbd>Mouse</kbd> Aim with the cursor</p><p id="helpClassicAim" class="hidden"><kbd>A / D / W / S</kbd> Aim in the direction you move</p><p id="helpMouseControls"><kbd>Mouse scheme</kbd> Left click fires your equipped weapon; right click fires a rocket; Space dashes. Pickups automatically equip; 1 / 2 / 3 can select weapons with ammo.</p><p id="helpClassicControls" class="hidden"><kbd>Keyboard scheme</kbd> Hold J to fire your equipped weapon; K dashes; L fires a rocket. Pickups automatically equip.</p><p id="helpTouchControls" class="hidden"><kbd>Touch screen</kbd> Left stick moves, right stick aims and automatically fires your equipped weapon. DASH sits beside aim; ROCKET launches a rocket.</p><p><kbd>Pickups</kbd> Rifle: 15 shots. SMG: 30 fast, low-damage shots. Heavy Cannon: 3 slow, high-damage shots. Weapon pickups automatically equip.</p><p><kbd id="helpDashHint">Space</kbd> Dash and briefly avoid damage; time it against incoming shots for a perfect dodge</p><p><kbd>Walls</kbd> Press away from a wall to kick off and reposition</p><p><kbd id="helpPauseHint">P / ESC</kbd> Pause the action</p><p><kbd>R</kbd> Restart the run</p></div>
+      <p class="tip-box">Rockets damage every enemy caught in the blast, and enemies can shoot from anywhere in the arena. Keep moving, collect medkits when your health is low, and save rockets for groups or bosses.</p>
+      <button id="startTutorialButton" class="action-button action-secondary full-width" type="button">START TRAINING SIM // NO WARDEN</button>
+      <button class="action-button action-primary full-width" data-close="helpPanel" type="button">GOT IT</button>
+    </section>
+
+    <section id="pausePanel" class="overlay-panel hidden" aria-labelledby="pauseTitle">
+      <div class="overlay-card"><p class="eyebrow">COMBAT SUSPENDED</p><h2 id="pauseTitle">PAUSED</h2><p>Catch your breath. The tower is still waiting.</p><button id="resumeButton" class="action-button action-primary full-width" type="button">RESUME MISSION</button><button id="restartButton" class="action-button action-secondary full-width" type="button">RESTART RUN</button><button id="returnMenuButton" class="text-button" type="button">ABORT TO MAIN MENU</button></div>
+    </section>
+
+    <section id="resultPanel" class="overlay-panel hidden" aria-labelledby="resultTitle">
+      <div class="overlay-card"><p id="resultEyebrow" class="eyebrow">MISSION REPORT</p><h2 id="resultTitle">RUN ENDED</h2><p id="resultMessage">The tower won this round.</p><p id="resultMode" class="result-record">TOWER RUN</p><div class="result-stats"><div><strong id="resultScore">0</strong><span>SCORE</span></div><div><strong id="resultFloor">1</strong><span>HIGHEST FLOOR</span></div><div><strong id="resultTime">00:00.00</strong><span>TIME</span></div><div><strong id="resultBestScore">000000</strong><span>MODE BEST</span></div><div><strong id="resultEnemies">0</strong><span>HOSTILES DOWN</span></div><div><strong id="resultRockets">0</strong><span>ROCKETS USED</span></div></div><p id="resultRecord" class="result-record"></p><button id="retryButton" class="action-button action-primary full-width" type="button">RETRY RUN</button><button id="resultMenuButton" class="action-button action-secondary full-width" type="button">MAIN MENU</button></div>
+    </section>
+
+    <section id="floorClearPanel" class="overlay-panel floor-clear-panel hidden" aria-live="assertive" aria-labelledby="floorClearTitle">
+      <div class="overlay-card">
+        <p class="eyebrow">HOSTILE SECTOR SECURED</p>
+        <h2 id="floorClearTitle">FLOOR CLEARED</h2>
+        <p id="floorClearDetail">PREPARING NEXT FLOOR...</p>
+      </div>
+    </section>
+
+    <section id="recordsPanel" class="dialog-panel narrow-panel hidden" aria-labelledby="recordsTitle">
+      <div class="dialog-top"><span class="eyebrow">OPERATOR PROGRESS</span><button class="close-button" data-close="recordsPanel" aria-label="Close records">×</button></div>
+      <h2 id="recordsTitle">RECORDS & CHALLENGE</h2>
+      <p id="dailyChallengeText" class="tip-box"></p>
+      <div id="achievementList" class="help-list"></div>
+      <div id="masteryList" class="help-list"></div>
+    </section>
+
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
