@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#08090d" />
-  <title>Stickman Gun Tower — Breakpoint</title>
+  <title>Stickman Gun Space — Breakpoint</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main id="game-shell" aria-label="Stickman Gun Tower game">
+  <main id="game-shell" aria-label="Stickman Gun Space game">
     <canvas id="game" width="1280" height="720" aria-label="Gameplay arena"></canvas>
 
     <div id="hud" class="in-game-only">
@@ -27,8 +27,8 @@
         <div><kbd>W / S</kbd><span>Float up / down</span></div>
         <div><kbd id="aimKeyHint">Mouse</kbd><span id="aimHint">Aim with the cursor</span></div>
         <div id="weaponSelectControl"><kbd id="weaponKeysHint">1 / 2 / 3</kbd><span id="weaponSelectHint">Equip rifle / SMG / cannon</span></div>
-        <div id="mouseFireControl"><kbd>Left click</kbd><span>Hold to fire equipped weapon</span></div>
-        <div id="classicFireControl" class="hidden"><kbd>J</kbd><span>Hold to fire equipped weapon</span></div>
+        <div id="mouseFireControl"><kbd>Left click</kbd><span>Hold to use loaded ammo; switches to Pistol when empty</span></div>
+        <div id="classicFireControl" class="hidden"><kbd>J</kbd><span>Hold to use loaded ammo; switches to Pistol when empty</span></div>
         <div><kbd>WEAPON</kbd><span id="weaponLabel">Pistol</span></div>
         <div><kbd id="rocketKeyHint">Right click</kbd><span>Fire a rocket (1 per pickup)</span></div>
         <div><kbd id="dashKeyHint">K</kbd><span>Dash</span></div>
@@ -65,13 +65,13 @@
       <div class="menu-layout">
         <div class="menu-copy">
           <p class="eyebrow">COMBAT SIMULATION // OPERATOR 01</p>
-          <h1 id="gameTitle">STICKMAN<br><span>GUN TOWER</span></h1>
+          <h1 id="gameTitle">STICKMAN<br><span>GUN SPACE</span></h1>
           <p class="menu-description">Breach eleven hostile floors. Adapt your loadout in combat, survive the crossfire, and set a new clear-time record.</p>
           <div class="menu-actions">
             <button id="playButton" class="action-button action-primary" type="button"><span>▶</span> DEPLOY NOW</button>
             <button id="howToButton" class="action-button action-secondary" type="button">HOW TO PLAY <span>↗</span></button>
           </div>
-          <label class="menu-control-preset" for="controlSchemeSelect"><span>CONTROL PRESET</span><select id="controlSchemeSelect"><option value="mouse">Mouse / Number Keys</option><option value="classic">Keyboard Aim / J-K-L</option><option value="touch">Touch Screen</option></select></label>
+          <label class="menu-control-preset" for="controlSchemeSelect"><span>CONTROL PRESET</span><select id="controlSchemeSelect"><option value="mouse">Mouse / Number Keys</option><option value="classic">Keyboard Aim / J-K-L</option></select></label>
       <div class="menu-stats">
             <div><strong id="bestScore">000000</strong><span id="bestScoreLabel">TOWER BEST</span></div>
             <div><strong>11</strong><span>TOWER FLOORS</span></div>
@@ -124,9 +124,19 @@
       <div class="overlay-card"><p id="resultEyebrow" class="eyebrow">MISSION REPORT</p><h2 id="resultTitle">RUN ENDED</h2><p id="resultMessage">The tower won this round.</p><p id="resultMode" class="result-record">TOWER RUN</p><div class="result-stats"><div><strong id="resultScore">0</strong><span>SCORE</span></div><div><strong id="resultFloor">1</strong><span>HIGHEST FLOOR</span></div><div><strong id="resultTime">00:00.00</strong><span>TIME</span></div><div><strong id="resultBestScore">000000</strong><span>MODE BEST</span></div><div><strong id="resultEnemies">0</strong><span>HOSTILES DOWN</span></div><div><strong id="resultRockets">0</strong><span>ROCKETS USED</span></div></div><p id="resultRecord" class="result-record"></p><button id="retryButton" class="action-button action-primary full-width" type="button">RETRY RUN</button><button id="resultMenuButton" class="action-button action-secondary full-width" type="button">MAIN MENU</button></div>
     </section>
 
+    <section id="tutorialFinishConfirm" class="overlay-panel hidden" aria-labelledby="tutorialFinishTitle">
+      <div class="overlay-card">
+        <p id="tutorialConfirmEyebrow" class="eyebrow">TRAINING COMPLETE</p>
+        <h2 id="tutorialFinishTitle">END TUTORIAL?</h2>
+        <p id="tutorialConfirmMessage">Are you sure you want to finish the tutorial and choose your mission?</p>
+        <button id="tutorialFinishYes" class="action-button action-primary full-width" type="button">YES. LET'S DO THIS</button>
+        <button id="tutorialFinishNo" class="action-button action-secondary full-width" type="button">NO. I WANT TO LEARN MORE</button>
+      </div>
+    </section>
+
     <section id="floorClearPanel" class="overlay-panel floor-clear-panel hidden" aria-live="assertive" aria-labelledby="floorClearTitle">
       <div class="overlay-card">
-        <p class="eyebrow">HOSTILE SECTOR SECURED</p>
+        <p id="floorClearEyebrow" class="eyebrow">HOSTILE SECTOR SECURED</p>
         <h2 id="floorClearTitle">FLOOR CLEARED</h2>
         <p id="floorClearDetail">PREPARING NEXT FLOOR...</p>
       </div>

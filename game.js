@@ -12,17 +12,15 @@ const helpPanel = document.getElementById("helpPanel");
 const pausePanel = document.getElementById("pausePanel");
 const resultPanel = document.getElementById("resultPanel");
 const allMenuPanels = [loadoutPanel, helpPanel];
-const touchAvailable = navigator.maxTouchPoints > 0 || window.matchMedia("(pointer: coarse)").matches;
-
 const settings = {
   sound: true,
   shake: true,
   difficulty: ["easy", "normal", "hard"].includes(storageGet("sgtTowerDifficulty"))
     ? storageGet("sgtTowerDifficulty")
     : "normal",
-  controlScheme: ["mouse", "classic", "touch"].includes(storageGet("sgtControlScheme"))
+  controlScheme: ["mouse", "classic"].includes(storageGet("sgtControlScheme"))
     ? storageGet("sgtControlScheme")
-    : touchAvailable ? "touch" : "mouse",
+    : "mouse",
 };
 const survivalDifficultyStats = {
   easy: { speed: 0.65, damage: 0.65, count: 0.8, fireRate: 0.8 },
@@ -63,18 +61,22 @@ const floorConfigs = {
 };
 const tutorialLessons = [
   { title: "MOVEMENT & FLOATING", detail: "Move horizontally and control your height. Use the arena space to avoid incoming fire." },
-  { title: "AIM & FIRE", detail: "Aim at the Grunt and fire your Pistol. Keep moving between shots to make yourself harder to hit.", enemy: "grunt" },
-  { title: "DASH & RUNNER", detail: "Runners rush in with a knife and strike at close range. Dash away or through danger to evade their attack.", enemy: "runner" },
+  { title: "AIM & FIRE", detail: "Aim and fire your equipped weapon using your selected controls. Keep moving between shots to make yourself harder to hit." },
+  { title: "DASHING", detail: "Use your dash control to quickly reposition and briefly avoid damage. Time it to pass through incoming attacks." },
+  { title: "PICKUPS & RECOVERY", detail: "Walk over weapon and rocket pickups to collect them. Medkits restore health; rockets deal area damage to groups." },
+  { title: "FIELD SKILLS", detail: "Use dash to evade attacks, float to change elevation, and wall-kick by pushing into an arena edge. Keep moving during every fight." },
+  { title: "GRUNT", detail: "Grunts chase you across the arena. Keep moving and aim before firing.", enemy: "grunt" },
+  { title: "RUNNER", detail: "Runners rush in with a knife and strike at close range. Dash away or through danger to evade their attack.", enemy: "runner" },
   { title: "RANGED GUNNER", detail: "Gunners keep their distance and shoot aimed projectiles. Watch for the attack tell and dodge sideways.", enemy: "gunner" },
   { title: "ARMORED HOSTILE", detail: "Armored enemies take reduced weapon damage. Use a Heavy Cannon if available, or keep firing while avoiding their shots.", enemy: "armored" },
   { title: "EXPLODER", detail: "Exploders sprint toward you and detonate nearby. Keep your distance and shoot them before they get close.", enemy: "exploder" },
   { title: "MEDIC", detail: "Medics hang back and restore nearby allies. Prioritize them so the rest of the group cannot recover.", enemy: "medic", ally: "grunt" },
   { title: "TELEPORTER", detail: "Teleporters blink to new positions, making their movement unpredictable. Track their new location before aiming.", enemy: "teleporter" },
-  { title: "DRONE", detail: "Drones hover and fire from range. Stay mobile and lead your shots when they drift.", enemy: "drone" },
   { title: "SPLITTER", detail: "A Splitter deploys two fast Runners when defeated. Be ready to reposition as soon as it breaks apart.", enemy: "splitter" },
   { title: "SHIELDBEARER", detail: "Shieldbearers protect enemies behind their shield. Flank them or reposition until you have a clear shot.", enemy: "shieldbearer", ally: "grunt" },
-  { title: "PICKUPS & RECOVERY", detail: "Walk over weapon and rocket pickups to collect them. Medkits restore health; rockets deal area damage to groups." },
-  { title: "FIELD SKILLS", detail: "Use dash to evade attacks, float to change elevation, and wall-kick by pushing into an arena edge. Keep moving during every fight." },
+  { title: "WARDEN // PHASE 1", detail: "The Warden tracks your position and fires aimed volleys. Keep moving and watch its attack tell.", enemy: "boss", bossPhase: 1 },
+  { title: "WARDEN // PHASE 2", detail: "At 75% health, the Warden speeds up and alternates aimed shots with a spread. Move through the gaps.", enemy: "boss", bossPhase: 2 },
+  { title: "WARDEN // PHASE 3", detail: "Below 30% health, the Warden fires a wider spread. Stay mobile and dash through a safe gap.", enemy: "boss", bossPhase: 3 },
 ];
 const towerFloorEnemyCounts = [0, 5, 7, 9, 11, 13, 1, 11, 13, 15, 17, 4];
 function storageGet(key, fallback = null) { try { return localStorage.getItem(key) ?? fallback; } catch (_) { return fallback; } }
@@ -86,6 +88,24 @@ const HEIGHT = canvas.height;
 const ROCKET_PICKUP_RESPAWN_SECONDS = 12;
 const keys = {};
 let mouseAim = null;
+
+function resizeCanvas() {
+  const { width, height } = canvas.getBoundingClientRect();
+  if (!width || !height) return;
+
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const resolutionWidth = Math.round(width * pixelRatio);
+  const resolutionHeight = Math.round(height * pixelRatio);
+  if (canvas.width !== resolutionWidth || canvas.height !== resolutionHeight) {
+    canvas.width = resolutionWidth;
+    canvas.height = resolutionHeight;
+  }
+  ctx.setTransform(canvas.width / WIDTH, 0, 0, canvas.height / HEIGHT, 0, 0);
+}
+
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+new ResizeObserver(resizeCanvas).observe(canvas);
 
 const state = {
   screen: "menu",
@@ -196,11 +216,11 @@ function damageEnemy(enemy, damage, x, y, particleColor = "#9ae6ff", weaponType 
   }
   if (enemy.isBoss && enemy.phaseTwo && !enemy.phaseThree && enemy.hp <= enemy.maxHp * 0.3) {
     enemy.phaseThree = true;
-    enemy.speed *= 1.2;
+    enemy.speed *= 1.1;
     enemy.attackPattern = "fan";
-    enemy.fireCooldown = 0.1;
+    enemy.fireCooldown = 0.25;
     enemy.phaseChangeTimer = 1.8;
-    setStatus("WARDEN PHASE 3 // 30% // LAST STAND // MAXIMUM AGGRESSION");
+    setStatus("WARDEN PHASE 3 // 30% // LAST STAND");
     state.announcement = 3;
   }
   if (enemy.hp <= 0) {
@@ -412,6 +432,7 @@ function showMainMenu() {
   resultPanel.classList.add("hidden");
   document.getElementById("floorClearPanel").classList.add("hidden");
   document.getElementById("tutorialPanel").classList.add("hidden");
+  document.getElementById("tutorialFinishConfirm").classList.add("hidden");
   closeMenuPanels();
   document.querySelectorAll("[data-mode]").forEach(item => item.classList.toggle("selected", item.dataset.mode === "tower"));
   document.getElementById("towerDifficultyRow").classList.add("hidden");
@@ -428,6 +449,7 @@ function startMission() {
   pausePanel.classList.add("hidden");
   resultPanel.classList.add("hidden");
   document.getElementById("floorClearPanel").classList.add("hidden");
+  document.getElementById("tutorialFinishConfirm").classList.add("hidden");
   document.getElementById("tutorialPanel").classList.toggle("hidden", state.mode !== "tutorial");
   document.body.classList.add("playing");
   state.screen = "playing";
@@ -544,12 +566,27 @@ function renderTutorialLesson() {
 function performDash() {
   if (state.screen !== "playing" || player.dashCooldown > 0) return;
   const nearProjectile = state.enemyBullets.some(bullet => Math.hypot(bullet.x - player.x, bullet.y - player.y) < 72);
-  const dashX = Math.cos(player.angle || 0) * 95;
-  const dashY = Math.sin(player.angle || 0) * 95;
+  let directionX = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
+  let directionY = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0);
+  let directionLength = Math.hypot(directionX, directionY);
+  if (directionLength === 0) {
+    directionX = player.vx;
+    directionY = player.vy;
+    directionLength = Math.hypot(directionX, directionY);
+  }
+  if (directionLength < 1) {
+    directionX = player.facing || 1;
+    directionY = 0;
+    directionLength = 1;
+  }
+  directionX /= directionLength;
+  directionY /= directionLength;
+  const dashX = directionX * 95;
+  const dashY = directionY * 95;
   player.x = clamp(player.x + dashX, 30, WIDTH - 30);
   player.y = clamp(player.y + dashY, 30, HEIGHT - 30);
-  player.vx = Math.cos(player.angle || 0) * 420;
-  player.vy = Math.sin(player.angle || 0) * 420;
+  player.vx = directionX * 420;
+  player.vy = directionY * 420;
   player.dashCooldown = 0.8;
   player.invuln = 0.25;
   player.dashFlash = 0.24;
@@ -603,7 +640,7 @@ function createEnemy(forcedType = null) {
     : floorConfigs[Math.min(state.floor, 11)] || floorConfigs[11];
   let type = forcedType || config.mix[Math.floor(Math.random() * config.mix.length)];
   if (!forcedType && type !== "boss" && Math.random() < 0.12) {
-    type = ["medic", "teleporter", "drone", "splitter", "shieldbearer"][Math.floor(Math.random() * 5)];
+    type = ["medic", "teleporter", "splitter", "shieldbearer"][Math.floor(Math.random() * 4)];
   }
   const boss = type === "boss";
   if (boss) type = "boss";
@@ -617,7 +654,6 @@ function createEnemy(forcedType = null) {
     exploder: { speed: 112, hp: 100, cooldown: 0, behavior: "explode", color: "#ff9d44" },
     medic: { speed: 70, hp: 125, cooldown: 2.4, behavior: "medic", color: "#78f0a0" },
     teleporter: { speed: 105, hp: 100, cooldown: 1.8, behavior: "teleport", color: "#d49aff" },
-    drone: { speed: 88, hp: 100, cooldown: 1.45, behavior: "drone", color: "#75ddff" },
     splitter: { speed: 88, hp: 150, cooldown: 0, behavior: "split", color: "#ffad5c" },
     shieldbearer: { speed: 56, hp: 225, cooldown: 2.7, behavior: "shield", color: "#80b6ff" },
     boss: { speed: 78, hp: 2000 + Math.min(state.floor, 12) * 100, cooldown: 1.05, behavior: "boss", color: "#ff9275" },
@@ -728,6 +764,24 @@ function updateHealPickup(dt) {
   state.healSpawnTimer = rand(10, 22);
 }
 
+function showFloorNotification(kind, duration) {
+  const panel = document.getElementById("floorClearPanel");
+  const starting = kind === "starting";
+  const noun = state.mode === "survival" ? "WAVE" : "FLOOR";
+  panel.classList.remove("floor-starting", "floor-ending");
+  document.getElementById("floorClearEyebrow").textContent = starting ? "HOSTILE SECTOR INCOMING" : "HOSTILE SECTOR SECURED";
+  document.getElementById("floorClearTitle").textContent = starting
+    ? `${noun} ${state.floor} STARTING`
+    : `${noun} ${state.floor} CLEARED`;
+  document.getElementById("floorClearDetail").textContent = starting
+    ? "NEW SECTOR DETECTED: PREPARE TO DEPLOY"
+    : state.mode === "tower" ? "PREPARING NEXT FLOOR..." : "PREPARING NEXT WAVE...";
+  panel.classList.add(starting ? "floor-starting" : "floor-ending");
+  panel.classList.remove("hidden");
+  void panel.offsetWidth;
+  state.floorTransition = duration;
+}
+
 function buildLevel() {
   state.enemies = [];
   state.bullets = [];
@@ -766,7 +820,7 @@ function buildLevel() {
       : state.mode === "survival" && state.floor % 5 === 0 && i === 0
         ? "boss"
         : config.mix[i % config.mix.length];
-    if (type !== "boss" && Math.random() < 0.12) type = ["medic", "teleporter", "drone", "splitter", "shieldbearer"][Math.floor(Math.random() * 5)];
+    if (type !== "boss" && Math.random() < 0.12) type = ["medic", "teleporter", "splitter", "shieldbearer"][Math.floor(Math.random() * 4)];
     const enemy = createEnemy(type);
     const lane = i % 4;
     enemy.x = rand(730, WIDTH - 55);
@@ -786,9 +840,10 @@ function buildLevel() {
   if (state.arenaModifier?.id === "containment") {
     for (const enemy of state.enemies) if (!enemy.isBoss && Math.random() < 0.22) enemy.shielded = true;
   }
-  setStatus(state.mode === "tutorial" ? "TRAINING SIMULATION // WARDEN EXCLUDED"
+  setStatus(state.mode === "tutorial" ? "TRAINING SIMULATION // ENCOUNTERS ON DEMAND"
     : state.mode === "tower" ? `FLOOR ${state.floor} // ${config.title} // ${state.arenaModifier.title}`
       : `WAVE ${state.wave} // ${getSurvivalThreatLabel()} THREAT // ${state.arenaModifier.title}`);
+  if (state.mode !== "tutorial") showFloorNotification("starting", 2);
 }
 
 function spawnTutorialLesson() {
@@ -800,6 +855,14 @@ function spawnTutorialLesson() {
   const types = lesson.ally ? [lesson.enemy, lesson.ally] : [lesson.enemy];
   types.forEach((type, index) => {
     const enemy = createEnemy(type);
+    if (lesson.bossPhase) {
+      enemy.hp = enemy.maxHp * (lesson.bossPhase === 1 ? 1 : lesson.bossPhase === 2 ? 0.6 : 0.2);
+      enemy.phaseTwo = lesson.bossPhase >= 2;
+      enemy.phaseThree = lesson.bossPhase >= 3;
+      enemy.attackPattern = lesson.bossPhase >= 2 ? "fan" : "aimed";
+      enemy.speed *= lesson.bossPhase === 2 ? 1.25 : lesson.bossPhase === 3 ? 1.5 : 1;
+      enemy.fireCooldown = lesson.bossPhase === 3 ? 0.9 : lesson.bossPhase === 2 ? 1.05 : 1.55;
+    }
     enemy.x = 820 + index * 120;
     enemy.y = index % 2 ? 410 : 300;
     if (lesson.enemy === "shieldbearer" && type === "shieldbearer") enemy.angle = Math.PI;
@@ -901,6 +964,11 @@ function hitPlayer(amount) {
   }
 }
 
+function findLoadedWeapon(preferredWeapon = state.weapon) {
+  if (preferredWeapon !== "pistol" && state.weaponAmmo[preferredWeapon] > 0) return preferredWeapon;
+  return ["rifle", "smg", "heavy"].find(weapon => state.weaponAmmo[weapon] > 0) || "pistol";
+}
+
 function shootPlayer(useRocket = false, selectedWeapon = state.weapon) {
   if (state.gameOver) return;
   if (player.fireCooldown > 0) return;
@@ -934,14 +1002,9 @@ function shootPlayer(useRocket = false, selectedWeapon = state.weapon) {
     return;
   }
 
-  const weaponType = selectedWeapon;
+  const weaponType = findLoadedWeapon(selectedWeapon);
+  state.weapon = weaponType;
   const weapon = weaponStats[weaponType] || weaponStats.rifle;
-  if (weaponType !== "pistol" && state.weaponAmmo[weaponType] <= 0) {
-    if (state.weapon === weaponType) state.weapon = "pistol";
-    setStatus(`${weapon.label} ammo depleted. Select the Pistol.`);
-    updateHud();
-    return;
-  }
 
   if (weaponType !== "pistol") {
     state.weaponAmmo[weaponType] -= 1;
@@ -970,8 +1033,10 @@ function shootPlayer(useRocket = false, selectedWeapon = state.weapon) {
   player.gunFlash = 0.08;
   playTone(weaponType === "heavy" ? 95 : weaponType === "smg" ? 290 : 180, weaponType === "heavy" ? 0.1 : 0.045, "square", weaponType === "heavy" ? 0.04 : 0.018);
   if (weaponType !== "pistol" && state.weaponAmmo[weaponType] === 0 && state.weapon === weaponType) {
-    state.weapon = "pistol";
-    setStatus(`${weapon.label} empty. Select the Pistol.`);
+    state.weapon = findLoadedWeapon();
+    setStatus(state.weapon === "pistol"
+      ? `${weapon.label} empty. Switching to Pistol.`
+      : `${weapon.label} empty. Switching to ${weaponStats[state.weapon].label}.`);
   }
   updateHud();
 }
@@ -984,7 +1049,7 @@ function shootEnemy(enemy) {
   const aimAngle = Math.atan2(dy + player.vy * lead, dx + player.vx * lead) + rand(-0.09, 0.09);
   const fan = enemy.isBoss && enemy.phaseTwo && enemy.attackPattern === "fan";
   const spread = fan
-    ? enemy.phaseThree ? [-0.48, -0.32, -0.16, 0, 0.16, 0.32, 0.48] : [-0.34, -0.17, 0, 0.17, 0.34]
+    ? enemy.phaseThree ? [-0.32, -0.16, 0, 0.16, 0.32] : [-0.34, -0.17, 0, 0.17, 0.34]
     : [0];
   for (const offset of spread) {
     const angle = aimAngle + offset;
@@ -995,7 +1060,7 @@ function shootEnemy(enemy) {
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       radius: enemy.isBoss ? 6 : 5,
-        damage: (enemy.isBoss ? 12 * (enemy.phaseThree ? 1.5 : enemy.phaseTwo ? 1.25 : 1) : enemy.type === "gunner" || enemy.type === "drone" ? 7 : 8) * getDifficultyStats().damage * Math.min(state.threatScale, 1.4) * (state.lastStandActive ? 1.25 : 1),
+        damage: (enemy.isBoss ? 12 * (enemy.phaseThree ? 1.2 : enemy.phaseTwo ? 1.25 : 1) : enemy.type === "gunner" ? 7 : 8) * getDifficultyStats().damage * Math.min(state.threatScale, 1.4) * (state.lastStandActive ? 1.25 : 1),
       team: "enemy",
     });
   }
@@ -1386,17 +1451,14 @@ function updateEnemies(dt) {
     const dirX = player.x - enemy.x;
     const dirY = player.y - enemy.y;
     const dist = Math.hypot(dirX, dirY) || 1;
-    const canFire = enemy.type === "gunner" || enemy.type === "drone" || enemy.type === "teleporter" || enemy.type === "shieldbearer" || enemy.isBoss || enemy.type === "grunt" || enemy.type === "armored";
+    const canFire = enemy.type === "gunner" || enemy.type === "teleporter" || enemy.type === "shieldbearer" || enemy.isBoss || enemy.type === "grunt" || enemy.type === "armored";
     enemy.phaseChangeTimer = Math.max(0, (enemy.phaseChangeTimer || 0) - dt);
 
-    if (enemy.behavior === "keep-distance" || enemy.behavior === "medic" || enemy.behavior === "drone") {
+    if (enemy.behavior === "keep-distance" || enemy.behavior === "medic") {
       const desired = enemy.behavior === "medic" ? 300 : 390;
       const approach = dist > desired + 45 ? 1 : dist < desired - 45 ? -1 : 0;
       enemy.vx += (dirX / dist) * approach * 105 * dt;
-      if (enemy.behavior === "drone") {
-        const hoverY = clamp(player.y - 125, 60, HEIGHT - 100);
-        enemy.vy += (hoverY - enemy.y) * 0.8 * dt;
-      } else enemy.vy += (dirY / dist) * approach * 105 * dt;
+      enemy.vy += (dirY / dist) * approach * 105 * dt;
     } else {
       const acceleration = enemy.behavior === "rush" ? 300 : enemy.behavior === "explode" ? 190 : 80;
       enemy.vx += (dirX / dist) * acceleration * dt;
@@ -1454,11 +1516,11 @@ function updateEnemies(dt) {
         hitPlayer(12 * getDifficultyStats().damage);
       }
     }
-    const firingRange = enemy.type === "gunner" || enemy.type === "drone" ? 620 : enemy.isBoss ? 700 : 560;
+    const firingRange = enemy.type === "gunner" ? 620 : enemy.isBoss ? 700 : 560;
     const firingDistance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
     if (enemy.fireCooldown <= 0 && canFire && firingDistance < firingRange) {
       shootEnemy(enemy);
-      enemy.fireCooldown = (enemy.isBoss ? enemy.phaseThree ? 0.72 : enemy.phaseTwo ? 1.05 : 1.55 : enemy.type === "gunner" ? 1.9 : enemy.type === "teleporter" ? 2.2 : 2.8) / (getDifficultyStats().fireRate * Math.min(state.threatScale, 1.6));
+      enemy.fireCooldown = (enemy.isBoss ? enemy.phaseThree ? 0.9 : enemy.phaseTwo ? 1.05 : 1.55 : enemy.type === "gunner" ? 1.9 : enemy.type === "teleporter" ? 2.2 : 2.8) / (getDifficultyStats().fireRate * Math.min(state.threatScale, 1.6));
       if (enemy.isBoss && enemy.phaseTwo && !enemy.phaseThree) enemy.attackPattern = enemy.attackPattern === "fan" ? "aimed" : "fan";
     }
 
@@ -1470,10 +1532,7 @@ function updateEnemies(dt) {
   if (alive === 0 && !state.gameOver && !state.levelCleared) {
     state.levelCleared = true;
     if (!state.floorTookDamage) unlockAchievement("untouchable");
-    document.getElementById("floorClearTitle").textContent = `FLOOR ${state.floor} CLEARED`;
-    document.getElementById("floorClearDetail").textContent = state.mode === "tower" ? "PREPARING NEXT FLOOR..." : "PREPARING NEXT WAVE...";
-    document.getElementById("floorClearPanel").classList.remove("hidden");
-    state.floorTransition = 0.25;
+    showFloorNotification("ending", 2);
     clearHeldInput();
     setStatus(`Floor ${state.floor} cleared!`);
   }
@@ -1528,6 +1587,9 @@ function update(dt) {
     if (state.floorTransition === 0 && state.levelCleared && !state.gameOver) {
       nextFloor();
       return;
+    }
+    if (state.floorTransition === 0) {
+      document.getElementById("floorClearPanel").classList.add("hidden");
     }
     updateHud();
     return;
@@ -2269,11 +2331,50 @@ document.getElementById("startTutorialButton").addEventListener("click", () => {
   startMission();
 });
 document.getElementById("tutorialPrevious").addEventListener("click", () => changeTutorialLesson(-1));
+let tutorialConfirmAction = "finish";
+function openTutorialConfirmation(action) {
+  tutorialConfirmAction = action;
+  const exiting = action === "exit";
+  document.getElementById("tutorialConfirmEyebrow").textContent = exiting ? "LEAVE TRAINING" : "TRAINING COMPLETE";
+  document.getElementById("tutorialFinishTitle").textContent = exiting ? "EXIT TUTORIAL?" : "END TUTORIAL?";
+  document.getElementById("tutorialConfirmMessage").textContent = exiting
+    ? "Are you sure you want to exit the tutorial?"
+    : "Are you sure you want to finish the tutorial and choose your mission?";
+  document.getElementById("tutorialFinishYes").textContent = exiting ? "YES. EXIT TUTORIAL" : "YES. LET'S DO THIS";
+  document.getElementById("tutorialFinishNo").textContent = exiting ? "NO. KEEP LEARNING" : "NO. I WANT TO LEARN MORE";
+  document.getElementById("tutorialFinishConfirm").classList.remove("hidden");
+}
 document.getElementById("tutorialNext").addEventListener("click", () => {
-  if (state.tutorialLesson === tutorialLessons.length - 1) showMainMenu();
+  if (state.tutorialLesson === tutorialLessons.length - 1) openTutorialConfirmation("finish");
   else changeTutorialLesson(1);
 });
-document.getElementById("tutorialExit").addEventListener("click", showMainMenu);
+document.getElementById("tutorialFinishYes").addEventListener("click", () => {
+  if (tutorialConfirmAction === "exit") {
+    document.getElementById("tutorialFinishConfirm").classList.add("hidden");
+    showMainMenu();
+    return;
+  }
+  clearHeldInput();
+  state.mode = "tower";
+  state.screen = "menu";
+  state.paused = false;
+  document.body.classList.remove("playing");
+  document.getElementById("tutorialPanel").classList.add("hidden");
+  document.getElementById("tutorialFinishConfirm").classList.add("hidden");
+  mainMenu.classList.remove("hidden");
+  closeMenuPanels();
+  document.querySelectorAll("[data-mode]").forEach(item => item.classList.toggle("selected", item.dataset.mode === "tower"));
+  document.getElementById("settingsRows").classList.add("hidden");
+  document.getElementById("towerDifficultyRow").classList.remove("hidden");
+  document.getElementById("confirmDeploy").classList.remove("hidden");
+  loadoutPanel.classList.remove("hidden");
+  updateLoadoutSummary();
+});
+document.getElementById("tutorialFinishNo").addEventListener("click", () => {
+  document.getElementById("tutorialFinishConfirm").classList.add("hidden");
+  if (tutorialConfirmAction === "finish") changeTutorialLesson(-1);
+});
+document.getElementById("tutorialExit").addEventListener("click", () => openTutorialConfirmation("exit"));
 document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => {
   state.mode = button.dataset.mode;
   document.querySelectorAll("[data-mode]").forEach(item => item.classList.toggle("selected", item === button));
@@ -2286,7 +2387,7 @@ document.getElementById("towerDifficultySelect").addEventListener("change", even
   updateLoadoutSummary();
 });
 document.getElementById("controlSchemeSelect").addEventListener("change", event => {
-  settings.controlScheme = ["mouse", "classic", "touch"].includes(event.target.value) ? event.target.value : "mouse";
+  settings.controlScheme = ["mouse", "classic"].includes(event.target.value) ? event.target.value : "mouse";
   storageSet("sgtControlScheme", settings.controlScheme);
   clearHeldInput();
   updateControlHints();
@@ -2309,3 +2410,4 @@ window.addEventListener("blur", pauseForFocusLoss);
 resetRun();
 showMainMenu();
 requestAnimationFrame(loop);
+

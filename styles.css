@@ -433,6 +433,14 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 .floor-clear-panel .overlay-card{border-color:#ff665a99;box-shadow:0 0 50px #ff382533}
 .floor-clear-panel h2{color:#fff0ed;text-shadow:0 0 24px #ff453c66}
 .floor-clear-panel #floorClearDetail{color:#ff9a8f;letter-spacing:.12em}
+.floor-clear-panel.floor-ending{animation:floorShadeIn .35s ease-out both}
+.floor-clear-panel.floor-starting{animation:floorShadeIn .45s ease-out both}
+.floor-clear-panel.floor-ending .overlay-card{animation:floorEndCardIn .55s cubic-bezier(.16,.8,.25,1) both}
+.floor-clear-panel.floor-starting .overlay-card{animation:floorStartCardIn .65s cubic-bezier(.16,.8,.25,1) both}
+@keyframes floorShadeIn{from{opacity:0}to{opacity:1}}
+@keyframes floorEndCardIn{from{opacity:0;transform:translateY(28px) scale(.9);filter:blur(8px)}to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
+@keyframes floorStartCardIn{0%{opacity:0;transform:translateY(-30px) scale(1.08);filter:blur(8px)}65%{opacity:1;transform:translateY(5px) scale(.99);filter:blur(0)}100%{transform:translateY(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){.floor-clear-panel.floor-ending,.floor-clear-panel.floor-starting,.floor-clear-panel.floor-ending .overlay-card,.floor-clear-panel.floor-starting .overlay-card{animation-duration:.01ms}}
 #recordsPanel{z-index:15}
 #recordsPanel{max-height:90%;overflow:auto}
 #recordsPanel .help-list{gap:7px;margin:13px 0}
@@ -444,7 +452,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 
 /* Training lessons and touch-first play */
 .mode-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-.tutorial-panel{position:absolute;z-index:6;top:76px;right:18px;width:min(390px,calc(100% - 36px));padding:15px 16px;border:1px solid #ff665a88;border-left:3px solid #ff5a4e;border-radius:4px;background:linear-gradient(135deg,#160e12f2,#080a10f2);box-shadow:0 10px 36px #0009;pointer-events:auto}
+.tutorial-panel{position:absolute;z-index:6;top:86px;right:18px;width:min(390px,calc(100% - 36px));padding:15px 16px;border:1px solid #ff665a88;border-left:3px solid #ff5a4e;border-radius:4px;background:linear-gradient(135deg,#160e12f2,#080a10f2);box-shadow:0 10px 36px #0009;pointer-events:auto}
 .tutorial-panel .eyebrow{margin:0 0 6px;font-size:8px}
 .tutorial-panel h2{margin:0;color:#fff;font:800 15px Orbitron,"Segoe UI",sans-serif}
 .tutorial-panel>p:not(.eyebrow){margin:8px 0 12px;color:#d0c3c7;font:12px/1.55 "Segoe UI",sans-serif}
@@ -466,5 +474,6 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 .touch-dash-button:active{filter:brightness(1.4)}
 body.touch-controls-enabled #controls{display:none}
 body.touch-controls-enabled canvas{touch-action:none}
-@media(max-width:800px){.mode-grid{grid-template-columns:1fr}.loadout-panel .choice-card{min-height:96px}.tutorial-panel{top:66px;right:10px;width:min(340px,calc(100% - 20px));padding:11px}.tutorial-panel h2{font-size:12px}.tutorial-panel>p:not(.eyebrow){font-size:11px}.tutorial-actions button{font-size:7px}.tutorial-actions .action-button{margin-left:0}}
-@media(max-width:480px){.tutorial-panel{top:63px;right:7px;width:calc(100% - 14px);padding:9px 10px}.tutorial-panel>p:not(.eyebrow){margin:5px 0 8px;font-size:10px}.touch-stick{bottom:12px;width:88px;height:88px}.touch-stick>span{width:34px;height:34px;margin:-17px}.touch-move-stick{left:10px}.touch-aim-cluster{right:10px;bottom:12px;grid-template-columns:45px 88px;grid-template-rows:34px 88px;gap:4px}.touch-dash-button,.touch-rocket-button{min-width:45px;min-height:34px;font-size:7px}.tutorial-actions{gap:5px}.tutorial-actions button{min-height:30px;padding:5px 7px}}
+@media(max-width:800px){.mode-grid{grid-template-columns:1fr}.loadout-panel .choice-card{min-height:96px}.tutorial-panel{top:76px;right:10px;width:min(340px,calc(100% - 20px));padding:11px}.tutorial-panel h2{font-size:12px}.tutorial-panel>p:not(.eyebrow){font-size:11px}.tutorial-actions button{font-size:7px}.tutorial-actions .action-button{margin-left:0}}
+@media(max-width:480px){.tutorial-panel{top:73px;right:7px;width:calc(100% - 14px);padding:9px 10px}.tutorial-panel>p:not(.eyebrow){margin:5px 0 8px;font-size:10px}.touch-stick{bottom:12px;width:88px;height:88px}.touch-stick>span{width:34px;height:34px;margin:-17px}.touch-move-stick{left:10px}.touch-aim-cluster{right:10px;bottom:12px;grid-template-columns:45px 88px;grid-template-rows:34px 88px;gap:4px}.touch-dash-button,.touch-rocket-button{min-width:45px;min-height:34px;font-size:7px}.tutorial-actions{gap:5px}.tutorial-actions button{min-height:30px;padding:5px 7px}}
+@media(max-width:800px){#game-shell{min-height:0}}
