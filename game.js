@@ -23,14 +23,14 @@ const settings = {
     : "mouse",
 };
 const survivalDifficultyStats = {
-  easy: { speed: 0.65, damage: 0.65, count: 0.8, fireRate: 0.8 },
+  easy: { speed: 0.65, damage: 0.65, count: 0.8, fireRate: 0.6 },
   normal: { speed: 1, damage: 1, count: 1, fireRate: 1 },
   hard: { speed: 1.4, damage: 1.5, count: 1.35, fireRate: 1.25 },
 };
 const towerDifficultyStats = {
-  easy: { speed: 0.8, damage: 0.8, count: 0.8, fireRate: 0.85 },
+  easy: { speed: 0.8, damage: 0.8, count: 0.8, fireRate: 0.6 },
   normal: { speed: 1, damage: 1, count: 1, fireRate: 1 },
-  hard: { speed: 1.25, damage: 1.25, count: 1.35, fireRate: 1.2 },
+  hard: { speed: 1.25, damage: 1.25, count: 1.35, fireRate: 1.25 },
 };
 const weaponStats = {
   pistol: { label: "Pistol", cooldown: 0.24, damage: 18, speed: 510, radius: 4, spread: 0.04, recoil: 1, impact: "spark" },
