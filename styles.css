@@ -437,6 +437,16 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 .floor-clear-panel.floor-starting{animation:floorShadeIn .45s ease-out both}
 .floor-clear-panel.floor-ending .overlay-card{animation:floorEndCardIn .55s cubic-bezier(.16,.8,.25,1) both}
 .floor-clear-panel.floor-starting .overlay-card{animation:floorStartCardIn .65s cubic-bezier(.16,.8,.25,1) both}
+.result-victory{background:radial-gradient(ellipse at 50% 38%,#f2a72330,transparent 52%),#05060bd9}
+.result-victory::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,#ffe27a 0 2px,transparent 3px),radial-gradient(circle,#ff7468 0 2px,transparent 3px),radial-gradient(circle,#fff4d6 0 1.5px,transparent 3px);background-size:97px 113px,137px 149px,71px 89px;background-position:12px 0,60px 45px,20px 70px;animation:celebrationFall 3.5s ease-out both}
+.result-victory .overlay-card{position:relative;animation:victoryCardIn .8s cubic-bezier(.16,.8,.25,1) both;border-color:#ffd66f99;box-shadow:0 0 65px #ffc83c38,0 20px 80px #000b}
+.result-victory #resultMessage{color:#ffe69a;text-shadow:0 0 18px #ffcd5a66;animation:victoryMessageIn .7s .35s both}
+.result-victory .result-stats{opacity:0;animation:scoreReveal .7s 1.6s ease-out forwards}
+@keyframes celebrationFall{0%{opacity:0;transform:translateY(-12%)}15%{opacity:1}100%{opacity:.5;transform:translateY(12%)}}
+@keyframes victoryCardIn{from{opacity:0;transform:translateY(24px) scale(.92);filter:blur(7px)}to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
+@keyframes victoryMessageIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+@keyframes scoreReveal{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.result-victory::before,.result-victory .overlay-card,.result-victory #resultMessage,.result-victory .result-stats{animation-duration:.01ms;animation-delay:0s}}
 @keyframes floorShadeIn{from{opacity:0}to{opacity:1}}
 @keyframes floorEndCardIn{from{opacity:0;transform:translateY(28px) scale(.9);filter:blur(8px)}to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
 @keyframes floorStartCardIn{0%{opacity:0;transform:translateY(-30px) scale(1.08);filter:blur(8px)}65%{opacity:1;transform:translateY(5px) scale(.99);filter:blur(0)}100%{transform:translateY(0) scale(1)}}
