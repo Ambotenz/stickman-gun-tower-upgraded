@@ -465,13 +465,14 @@ function showResult(victory = false) {
   clearHeldInput();
   document.getElementById("floorClearPanel").classList.add("hidden");
   state.victory = victory;
+  resultPanel.classList.toggle("result-victory", victory && state.mode === "tower");
   if (victory) playTone(520, 0.38, "triangle", 0.06);
   state.screen = "result";
   resultPanel.classList.remove("hidden");
   pausePanel.classList.add("hidden");
   document.getElementById("resultEyebrow").textContent = victory ? "TOWER CONQUERED" : "MISSION REPORT";
   document.getElementById("resultTitle").textContent = victory ? "TOWER CLEARED" : "RUN ENDED";
-  document.getElementById("resultMessage").textContent = victory ? "Every floor is clear. Operator, excellent work." : "The tower won this round. Re-arm and try again.";
+  document.getElementById("resultMessage").textContent = victory && state.mode === "tower" ? "CONGRATULATIONS FOR CLEARING THE GAME" : victory ? "Every floor is clear. Operator, excellent work." : "The tower won this round. Re-arm and try again.";
   document.getElementById("resultScore").textContent = String(state.score).padStart(6, "0");
   document.getElementById("resultFloor").textContent = String(state.floor);
   document.getElementById("resultTime").textContent = formatTime(state.runTime);
@@ -496,9 +497,7 @@ function showResult(victory = false) {
     const previousBestTime = Number(storageGet("sgtTowerBestClearTime"));
     const isNewBestTime = !Number.isFinite(previousBestTime) || previousBestTime <= 0 || state.runTime < previousBestTime;
     if (isNewBestTime) storageSet("sgtTowerBestClearTime", state.runTime);
-    document.getElementById("resultMessage").textContent = isNewBestTime
-      ? "Every floor is clear. New best clear time!"
-      : "Every floor is clear. Operator, excellent work.";
+    document.getElementById("resultMessage").textContent = "CONGRATULATIONS FOR CLEARING THE GAME";
     document.getElementById("bestClearTime").textContent = formatTime(Math.min(previousBestTime || state.runTime, state.runTime));
   }
 }
@@ -769,12 +768,17 @@ function showFloorNotification(kind, duration) {
   const starting = kind === "starting";
   const noun = state.mode === "survival" ? "WAVE" : "FLOOR";
   panel.classList.remove("floor-starting", "floor-ending");
-  document.getElementById("floorClearEyebrow").textContent = starting ? "HOSTILE SECTOR INCOMING" : "HOSTILE SECTOR SECURED";
-  document.getElementById("floorClearTitle").textContent = starting
-    ? `${noun} ${state.floor} STARTING`
+  const finalFloorIntro = starting && state.mode === "tower" && state.floor === 11;
+  document.getElementById("floorClearEyebrow").textContent = finalFloorIntro ? "FINAL CHALLENGE" : starting ? "HOSTILE SECTOR INCOMING" : "HOSTILE SECTOR SECURED";
+  document.getElementById("floorClearTitle").textContent = finalFloorIntro
+    ? "FINAL FLOOR GOODLUCK!!"
+    : starting
+      ? `${noun} ${state.floor} STARTING`
     : `${noun} ${state.floor} CLEARED`;
-  document.getElementById("floorClearDetail").textContent = starting
-    ? "NEW SECTOR DETECTED: PREPARE TO DEPLOY"
+  document.getElementById("floorClearDetail").textContent = finalFloorIntro
+    ? "THE WARDEN AWAITS"
+    : starting
+      ? "NEW SECTOR DETECTED: PREPARE TO DEPLOY"
     : state.mode === "tower" ? "PREPARING NEXT FLOOR..." : "PREPARING NEXT WAVE...";
   panel.classList.add(starting ? "floor-starting" : "floor-ending");
   panel.classList.remove("hidden");
@@ -1658,18 +1662,23 @@ function updateArenaModifier(dt) {
 function drawPlayer() {
   if (player.dashFlash > 0) { ctx.save(); ctx.globalAlpha = player.dashFlash / 0.24 * 0.55; ctx.translate(player.x - player.vx * 0.035, player.y - player.vy * 0.035); ctx.strokeStyle = "#ff6559"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, -18, 12, 0, Math.PI * 2); ctx.moveTo(0, -6); ctx.lineTo(0, 18); ctx.moveTo(0, 18); ctx.lineTo(-8, 34); ctx.moveTo(0, 18); ctx.lineTo(8, 34); ctx.stroke(); ctx.restore(); }
   ctx.save();
-  ctx.translate(player.x, player.y + Math.sin(state.time * 3.2) * 2);
-  const stride = Math.sin(state.time * 13) * Math.min(1, Math.hypot(player.vx, player.vy) / 150) * 7;
+  const moveAmount = Math.min(1, Math.hypot(player.vx, player.vy) / 150);
+  const gait = state.time * 13;
+  const stride = Math.sin(gait) * moveAmount * 8;
+  const bob = Math.abs(Math.sin(gait)) * moveAmount * 2.5 + Math.sin(state.time * 3.2) * 1.2;
+  const bodyLean = clamp(player.vx / Math.max(1, player.speed) * 0.12, -0.12, 0.12);
+  ctx.translate(player.x, player.y + bob);
 
   if (player.invuln > 0 && Math.floor(state.time * 18) % 2 === 0) {
     ctx.globalAlpha = 0.4;
   }
 
+  ctx.rotate(bodyLean);
   ctx.strokeStyle = player.hitFlash > 0 ? "#ffffff" : "#dff7ff";
   ctx.lineWidth = 4;
 
   ctx.beginPath();
-  ctx.arc(0, -18, 12, 0, Math.PI * 2);
+  ctx.arc(0, -18 + Math.sin(gait * 2) * moveAmount, 12, 0, Math.PI * 2);
   ctx.stroke();
 
   ctx.beginPath();
@@ -1688,7 +1697,7 @@ function drawPlayer() {
   ctx.stroke();
 
   ctx.save();
-  ctx.rotate(player.angle);
+  ctx.rotate(player.angle - bodyLean);
   const masteryCount = getWeaponMastery()[state.weapon] || 0;
   const masteryGoal = { pistol: 100, rifle: 250, smg: 300, heavy: 75 }[state.weapon];
   ctx.strokeStyle = masteryCount >= masteryGoal * 2 ? "#ff675c" : masteryCount >= masteryGoal ? "#ffb266" : "#7ee5ff";
@@ -1737,7 +1746,8 @@ function drawEnemy(enemy) {
   const leadFootLift = Math.max(0, Math.cos(gait)) * movement * 3;
   const trailFootLift = Math.max(0, Math.cos(gait + Math.PI)) * movement * 3;
   const facing = enemy.vx < -8 ? -1 : enemy.vx > 8 ? 1 : Math.sign(Math.cos(enemy.angle)) || 1;
-  ctx.translate(enemy.x, enemy.y + Math.sin(state.time * 3 + enemy.x) * movement);
+  const bob = Math.abs(Math.sin(gait)) * movement * (enemy.isBoss ? 2.5 : 1.8);
+  ctx.translate(enemy.x, enemy.y + Math.sin(state.time * 3 + enemy.x) * movement - bob);
   if (enemy.isBoss && enemy.phaseChangeTimer > 0) {
     const progress = 1 - enemy.phaseChangeTimer / (enemy.phaseThree ? 1.8 : 1.4);
     const pulseRadius = 38 + progress * 125;
@@ -1787,6 +1797,9 @@ function drawEnemy(enemy) {
   const enemyColor = enemy.hitFlash > 0 ? "#ffffff"
     : enemy.isBoss && enemy.phaseThree ? "#ff6258"
       : enemy.isBoss && enemy.phaseTwo ? "#ff9a58" : enemy.color;
+  const bodyLean = clamp(enemy.vx / Math.max(1, enemy.speed) * 0.1, -0.1, 0.1);
+  ctx.save();
+  ctx.rotate(bodyLean);
   ctx.strokeStyle = enemyColor;
   ctx.lineWidth = enemy.type === "armored" ? 6 : 4;
 
@@ -1814,7 +1827,7 @@ function drawEnemy(enemy) {
   ctx.stroke();
 
   ctx.save();
-  ctx.rotate(enemy.angle);
+  ctx.rotate(enemy.angle - bodyLean);
   if (enemy.type === "runner") {
     const swingProgress = enemy.knifeSwing > 0 ? 1 - enemy.knifeSwing / 0.22 : 0;
     const swingAngle = enemy.knifeSwing > 0 ? Math.sin(swingProgress * Math.PI) * 0.9 : 0;
@@ -1866,6 +1879,7 @@ function drawEnemy(enemy) {
   ctx.arc(15, 0, 3, 0, Math.PI * 2);
   ctx.arc(15, 3, 3, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
   ctx.restore();
 
   const healthRatio = clamp(enemy.hp / enemy.maxHp, 0, 1);
@@ -2012,8 +2026,14 @@ function drawParticles() {
 }
 
 function drawHudBars() {
-  const panelX = 18;
-  const panelY = 78;
+  const canvasRect = canvas.getBoundingClientRect();
+  const topbarRect = document.getElementById("topbar").getBoundingClientRect();
+  const scaleX = WIDTH / Math.max(1, canvasRect.width);
+  const scaleY = HEIGHT / Math.max(1, canvasRect.height);
+  // Anchor the canvas HUD to the real topbar so it stays just below the
+  // floor / mission panel at every shell size and responsive breakpoint.
+  const panelX = clamp((topbarRect.left - canvasRect.left + 8) * scaleX, 8, WIDTH - 478);
+  const panelY = clamp((topbarRect.bottom - canvasRect.top + 8) * scaleY, 8, HEIGHT - 76);
   const panelWidth = 470;
   const panelHeight = 68;
   const barX = panelX + 12;
