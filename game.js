@@ -1,4 +1,4 @@
-const canvas = document.getElementById("game");
+﻿const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const floorLabel = document.getElementById("floorLabel");
 const missionLabel = document.getElementById("missionLabel");
@@ -45,6 +45,7 @@ const arenaModifiers = [
   { id: "blackout", title: "BLACKOUT", detail: "Visibility briefly narrows around the operator." },
   { id: "overdrive", title: "WEAPON OVERDRIVE", detail: "All weapon cooldowns are reduced." },
   { id: "containment", title: "CONTAINMENT", detail: "Some hostiles deploy temporary shields." },
+  { id: "crossfire", title: "CROSS-LANE VOLLEY", detail: "Marked firing lanes sweep across the arena. Break line or dodge through the gaps." },
 ];
 const floorConfigs = {
   1: { title: "MOVEMENT & BASIC HOSTILES", mix: ["runner", "runner", "grunt"], detail: "tutorial" },
@@ -52,12 +53,12 @@ const floorConfigs = {
   3: { title: "ARMORED HOSTILES", mix: ["armored", "armored", "runner"], detail: "armor" },
   4: { title: "RANGED PRESSURE", mix: ["gunner", "gunner", "runner", "grunt"], detail: "ranged" },
   5: { title: "MIXED ASSAULT", mix: ["armored", "gunner", "exploder", "runner"], detail: "assault" },
-  6: { title: "WARDEN // MID-TOWER BOSS", mix: ["boss"], detail: "boss" },
+  6: { title: "WARDEN  ▸  MID-TOWER BOSS", mix: ["boss"], detail: "boss" },
   7: { title: "HOSTILE REINFORCEMENTS", mix: ["armored", "gunner", "runner"], detail: "reinforcements" },
   8: { title: "EXPLOSIVE CROSS-FIRE", mix: ["gunner", "exploder", "armored", "runner"], detail: "crossfire" },
   9: { title: "ARMORED GAUNTLET", mix: ["armored", "gunner", "armored", "exploder"], detail: "gauntlet" },
   10: { title: "FINAL APPROACH", mix: ["gunner", "armored", "exploder", "runner"], detail: "final-approach" },
-  11: { title: "WARDEN // FINAL ENCOUNTER", mix: ["gunner", "armored", "exploder"], detail: "boss" },
+  11: { title: "WARDEN  ▸  FINAL ENCOUNTER", mix: ["gunner", "armored", "exploder"], detail: "boss" },
 };
 const tutorialLessons = [
   { title: "MOVEMENT & FLOATING", detail: "Move horizontally and control your height. Use the arena space to avoid incoming fire." },
@@ -74,9 +75,9 @@ const tutorialLessons = [
   { title: "TELEPORTER", detail: "Teleporters blink to new positions, making their movement unpredictable. Track their new location before aiming.", enemy: "teleporter" },
   { title: "SPLITTER", detail: "A Splitter deploys two fast Runners when defeated. Be ready to reposition as soon as it breaks apart.", enemy: "splitter" },
   { title: "SHIELDBEARER", detail: "Shieldbearers protect enemies behind their shield. Flank them or reposition until you have a clear shot.", enemy: "shieldbearer", ally: "grunt" },
-  { title: "WARDEN // PHASE 1", detail: "The Warden tracks your position and fires aimed volleys. Keep moving and watch its attack tell.", enemy: "boss", bossPhase: 1 },
-  { title: "WARDEN // PHASE 2", detail: "At 75% health, the Warden speeds up and alternates aimed shots with a spread. Move through the gaps.", enemy: "boss", bossPhase: 2 },
-  { title: "WARDEN // PHASE 3", detail: "Below 30% health, the Warden fires a wider spread. Stay mobile and dash through a safe gap.", enemy: "boss", bossPhase: 3 },
+  { title: "WARDEN  ▸  PHASE 1", detail: "The Warden tracks your position and fires aimed volleys. Keep moving and watch its attack tell.", enemy: "boss", bossPhase: 1 },
+  { title: "WARDEN  ▸  PHASE 2", detail: "At 75% health, the Warden speeds up and alternates aimed shots with a spread. Move through the gaps.", enemy: "boss", bossPhase: 2 },
+  { title: "WARDEN  ▸  PHASE 3", detail: "Below 30% health, the Warden fires a wider spread. Stay mobile and dash through a safe gap.", enemy: "boss", bossPhase: 3 },
 ];
 const towerFloorEnemyCounts = [0, 5, 7, 9, 11, 13, 1, 11, 13, 15, 17, 4];
 function storageGet(key, fallback = null) { try { return localStorage.getItem(key) ?? fallback; } catch (_) { return fallback; } }
@@ -149,6 +150,9 @@ const state = {
   hazardActive: 0,
   hazardX: 0,
   hazardY: 0,
+  laneWarning: 0,
+  laneY: 0,
+  laneDirection: 1,
   blackoutActive: 0,
   survivalEvent: null,
   eventTimer: 0,
@@ -211,7 +215,7 @@ function damageEnemy(enemy, damage, x, y, particleColor = "#9ae6ff", weaponType 
     enemy.speed *= 1.25;
     enemy.fireCooldown = 0.15;
     enemy.phaseChangeTimer = 1.4;
-    setStatus("WARDEN PHASE 2 // 75% // SPEED AND FIRE RATE INCREASED");
+    setStatus("WARDEN PHASE 2  ▸  75%  ▸  SPEED AND FIRE RATE INCREASED");
     state.announcement = 2.5;
   }
   if (enemy.isBoss && enemy.phaseTwo && !enemy.phaseThree && enemy.hp <= enemy.maxHp * 0.3) {
@@ -220,7 +224,7 @@ function damageEnemy(enemy, damage, x, y, particleColor = "#9ae6ff", weaponType 
     enemy.attackPattern = "fan";
     enemy.fireCooldown = 0.25;
     enemy.phaseChangeTimer = 1.8;
-    setStatus("WARDEN PHASE 3 // 30% // LAST STAND");
+    setStatus("WARDEN PHASE 3  ▸  30%  ▸  LAST STAND");
     state.announcement = 3;
   }
   if (enemy.hp <= 0) {
@@ -235,12 +239,12 @@ function damageEnemy(enemy, damage, x, y, particleColor = "#9ae6ff", weaponType 
       state.aerialKills += 1;
       if (state.aerialKills === 3) {
         state.score += 100;
-        setStatus("AIR COMBO // +100 SCORE");
+        setStatus("AIR COMBO  ▸  +100 SCORE");
       }
     }
     state.particles.push({ x: enemy.x, y: enemy.y - 25, vx: 0, vy: -35, life: 0.8, maxLife: 0.8, size: 14, color: "#ffe2a5", text: `+${scoreBonus}` });
     recordKill(weaponType, enemy);
-    if (state.killStreak > 0 && state.killStreak % 5 === 0) { state.score += 125; setStatus(`${state.killStreak} HOSTILE STREAK // +125 BONUS`); }
+    if (state.killStreak > 0 && state.killStreak % 5 === 0) { state.score += 125; setStatus(`${state.killStreak} HOSTILE STREAK  ▸  +125 BONUS`); }
     spawnParticles(enemy.x, enemy.y, enemy.isBoss ? "#ffb380" : "#ffd98d", enemy.isBoss ? 36 : 16);
     if (enemy.type === "splitter" && !enemy.splitSpawned) {
       enemy.splitSpawned = true;
@@ -252,12 +256,12 @@ function damageEnemy(enemy, damage, x, y, particleColor = "#9ae6ff", weaponType 
         fragment.y = clamp(enemy.y + rand(-22, 22), 20, HEIGHT - 40);
         state.enemies.push(fragment);
       }
-      setStatus("SPLITTER // TWO RUNNERS DEPLOYED");
+      setStatus("SPLITTER  ▸  TWO RUNNERS DEPLOYED");
     }
     if (enemy.isBoss) { state.score += 250; state.shakeTimer = Math.max(state.shakeTimer, 0.45); state.slowMo = 0.75; playTone(75, 0.45, "sawtooth", 0.07); }
-    if (state.killStreak >= 10) setStatus(`KILLING SPREE // ${state.killStreak} HOSTILES // x${comboMultiplier.toFixed(1)}`);
-    else if (state.killStreak >= 3) setStatus(`${state.killStreak}X COMBO // +${scoreBonus} SCORE`);
-    else setStatus(enemy.isBoss ? "TARGET ELIMINATED // BOSS DOWN!" : "Enemy down.");
+    if (state.killStreak >= 10) setStatus(`KILLING SPREE  ▸  ${state.killStreak} HOSTILES  ▸  x${comboMultiplier.toFixed(1)}`);
+    else if (state.killStreak >= 3) setStatus(`${state.killStreak}X COMBO  ▸  +${scoreBonus} SCORE`);
+    else setStatus(enemy.isBoss ? "TARGET ELIMINATED  ▸  BOSS DOWN!" : "Enemy down.");
   }
 }
 
@@ -309,7 +313,7 @@ function unlockAchievement(id) {
   unlocked.push(id);
   storageSet("sgtAchievements", JSON.stringify(unlocked));
   const achievement = achievementDefinitions.find(item => item.id === id);
-  if (achievement) setStatus(`ACHIEVEMENT UNLOCKED // ${achievement.title}`);
+  if (achievement) setStatus(`ACHIEVEMENT UNLOCKED  ▸  ${achievement.title}`);
 }
 function updateDailyChallenge(type, amount = 1) {
   if (!state.dailyChallenge) return;
@@ -326,7 +330,7 @@ function updateDailyChallenge(type, amount = 1) {
     state.dailyChallenge.complete = true;
     storageSet(`sgtDaily-${state.dailyChallenge.date}`, "complete");
     state.score += 250;
-    setStatus(`DAILY CHALLENGE COMPLETE // +250 SCORE`);
+    setStatus(`DAILY CHALLENGE COMPLETE  ▸  +250 SCORE`);
   }
 }
 function recordKill(weaponType, enemy) {
@@ -352,17 +356,17 @@ function renderRecords() {
   state.dailyProgress = savedChallenge.progress || 0;
   if (state.dailyChallenge.complete) state.dailyProgress = state.dailyChallenge.target;
   const challengeNode = document.getElementById("dailyChallengeText");
-  if (challengeNode) challengeNode.textContent = `DAILY // ${state.dailyChallenge.title} // ${Math.min(state.dailyProgress, state.dailyChallenge.target)}/${state.dailyChallenge.target}${state.dailyChallenge.complete ? " // COMPLETE" : ""}`;
+  if (challengeNode) challengeNode.textContent = `DAILY  ▸  ${state.dailyChallenge.title}  ▸  ${Math.min(state.dailyProgress, state.dailyChallenge.target)}/${state.dailyChallenge.target}${state.dailyChallenge.complete ? "  ▸  COMPLETE" : ""}`;
   const unlocked = savedProgress("sgtAchievements", []);
   const achievementNode = document.getElementById("achievementList");
   if (achievementNode) achievementNode.innerHTML = `<p><strong>ACHIEVEMENTS</strong></p>${achievementDefinitions.map(item => `<p>${unlocked.includes(item.id) ? "✓" : "○"} ${item.title} — ${item.requirement}</p>`).join("")}`;
   const mastery = getWeaponMastery();
   const goals = { pistol: 100, rifle: 250, smg: 300, heavy: 75 };
   const masteryNode = document.getElementById("masteryList");
-  if (masteryNode) masteryNode.innerHTML = `<p><strong>WEAPON MASTERY // COSMETIC GUN TINTS</strong></p>${Object.keys(goals).map(weapon => {
+  if (masteryNode) masteryNode.innerHTML = `<p><strong>WEAPON MASTERY  ▸  COSMETIC GUN TINTS</strong></p>${Object.keys(goals).map(weapon => {
     const kills = mastery[weapon] || 0;
     const rank = kills >= goals[weapon] * 2 ? "ELITE TINT" : kills >= goals[weapon] ? "EXPERT TINT" : "ROOKIE";
-    return `<p>${weaponStats[weapon].label}: ${kills}/${goals[weapon]} kills // ${rank}</p>`;
+    return `<p>${weaponStats[weapon].label}: ${kills}/${goals[weapon]} kills  ▸  ${rank}</p>`;
   }).join("")}`;
 }
 
@@ -488,7 +492,7 @@ function showResult(victory = false) {
   document.getElementById("resultRecord").textContent = newRecord ? "NEW PERSONAL RECORD" : "PERSONAL RECORD NOT BEATEN";
   document.getElementById("resultMode").textContent = state.mode === "tower"
     ? `${settings.difficulty.toUpperCase()} TOWER RUN`
-    : state.mode === "survival" ? `${getSurvivalThreatLabel()} SURVIVAL // FLOOR ${state.floor}` : "TRAINING SIM";
+    : state.mode === "survival" ? `${getSurvivalThreatLabel()} SURVIVAL  ▸  FLOOR ${state.floor}` : "TRAINING SIM";
   document.getElementById("bestScore").textContent = String(best).padStart(6, "0");
 
   if (victory && state.mode === "tower") {
@@ -526,14 +530,11 @@ function updateControlHints() {
   document.body.classList.toggle("touch-controls-enabled", touch);
   document.getElementById("aimKeyHint").textContent = classic ? "A / D / W / S" : touch ? "Aim stick" : "Mouse";
   document.getElementById("aimHint").textContent = classic ? "Aim in the direction you move" : touch ? "Use the right stick to aim" : "Aim with the cursor";
-  document.getElementById("weaponKeysHint").textContent = "1 / 2 / 3";
-  document.getElementById("weaponSelectHint").textContent = "Equip rifle / SMG / cannon";
-  document.getElementById("weaponSelectControl").classList.toggle("hidden", classic || touch);
   document.getElementById("mouseFireControl").classList.toggle("hidden", classic || touch);
   document.getElementById("classicFireControl").classList.toggle("hidden", !classic);
   document.getElementById("rocketKeyHint").textContent = classic ? "L" : touch ? "Touch" : "Right click";
-  document.getElementById("menuWeaponHint").textContent = classic ? "J FIRE EQUIPPED // PICKUPS AUTO-EQUIP" : touch ? "TOUCH AIM / MOVE // EDGE TO FIRE" : "1 / 2 / 3 EQUIP // LEFT CLICK FIRE";
-  document.getElementById("menuFireHint").textContent = classic ? "K DASH // L ROCKET" : touch ? "DASH LEFT // ROCKET ABOVE AIM" : "SPACE DASH // RIGHT CLICK ROCKET";
+  document.getElementById("menuWeaponHint").textContent = classic ? "J FIRE EQUIPPED  ▸  PICKUPS AUTO-EQUIP" : touch ? "TOUCH AIM / MOVE  ▸  EDGE TO FIRE" : "PICKUPS AUTO-EQUIP  ▸  LEFT CLICK FIRE";
+  document.getElementById("menuFireHint").textContent = classic ? "K DASH  ▸  L ROCKET" : touch ? "DASH LEFT  ▸  ROCKET ABOVE AIM" : "SPACE DASH  ▸  RIGHT CLICK ROCKET";
   document.getElementById("dashKeyHint").textContent = classic ? "K" : touch ? "Touch" : "Space";
   document.getElementById("helpDashHint").textContent = classic ? "K" : touch ? "Touch dash button" : "Space";
   document.getElementById("pauseKeyHint").textContent = classic ? "ESC" : "P / ESC";
@@ -555,7 +556,7 @@ function renderTutorialLesson() {
     : classic
       ? "A / D move, W / S float, J fires, K dashes, and L launches a rocket."
       : "A / D move, W / S float, mouse aims, left click fires, Space dashes, and right click launches a rocket.";
-  document.getElementById("tutorialProgress").textContent = `TUTORIAL // LESSON ${state.tutorialLesson + 1} OF ${tutorialLessons.length}`;
+  document.getElementById("tutorialProgress").textContent = `TUTORIAL  ▸  LESSON ${state.tutorialLesson + 1} OF ${tutorialLessons.length}`;
   document.getElementById("tutorialTitle").textContent = lesson.title;
   document.getElementById("tutorialDetail").textContent = `${lesson.detail} ${controls}`;
   document.getElementById("tutorialPrevious").disabled = state.tutorialLesson === 0;
@@ -594,7 +595,7 @@ function performDash() {
     state.perfectDodges += 1;
     state.slowMo = 0.45;
     state.score += 100;
-    setStatus("PERFECT DODGE // +100 SCORE");
+    setStatus("PERFECT DODGE  ▸  +100 SCORE");
     playTone(680, 0.12, "triangle", 0.04);
   } else setStatus("Dash burst.");
 }
@@ -672,6 +673,7 @@ function createEnemy(forcedType = null) {
     isBoss: boss,
     type, behavior: profile.behavior, color: elite ? "#ffe46b" : profile.color, elite,
     hitFlash: 0, phaseTwo: false, phaseThree: false, phaseChangeTimer: 0, explodeTimer: 0,
+    skillTimer: 0, skillKind: "", skillTargetX: 0, skillTargetY: 0,
     summonCooldown: boss ? 10 : 0,
     abilityCooldown: type === "teleporter" ? 3 : type === "medic" ? 2.2 : 0,
     meleeCooldown: type === "runner" ? rand(0.25, 0.7) : 0,
@@ -733,7 +735,7 @@ function triggerSurvivalEvent() {
   state.eventTimer = 20;
   event.spawn();
   state.announcement = 3.2;
-  setStatus(`WAVE ${state.wave} // ${event.name} // ${event.message}`);
+  setStatus(`WAVE ${state.wave}  ▸  ${event.name}  ▸  ${event.message}`);
 }
 
 function updateWeaponPickup(dt) {
@@ -809,6 +811,9 @@ function buildLevel() {
   state.hazardWarning = 0;
   state.hazardActive = 0;
   state.blackoutActive = 0;
+  state.laneWarning = 0;
+  state.laneY = 0;
+  state.laneDirection = Math.random() < 0.5 ? 1 : -1;
 
   const config = state.mode === "tutorial"
     ? { title: "TRAINING SIMULATION", mix: [] }
@@ -844,9 +849,9 @@ function buildLevel() {
   if (state.arenaModifier?.id === "containment") {
     for (const enemy of state.enemies) if (!enemy.isBoss && Math.random() < 0.22) enemy.shielded = true;
   }
-  setStatus(state.mode === "tutorial" ? "TRAINING SIMULATION // ENCOUNTERS ON DEMAND"
-    : state.mode === "tower" ? `FLOOR ${state.floor} // ${config.title} // ${state.arenaModifier.title}`
-      : `WAVE ${state.wave} // ${getSurvivalThreatLabel()} THREAT // ${state.arenaModifier.title}`);
+  setStatus(state.mode === "tutorial" ? "TRAINING SIMULATION  ▸  ENCOUNTERS ON DEMAND"
+    : state.mode === "tower" ? `FLOOR ${state.floor}  ▸  ${config.title}  ▸  ${state.arenaModifier.title}`
+      : `WAVE ${state.wave}  ▸  ${getSurvivalThreatLabel()} THREAT  ▸  ${state.arenaModifier.title}`);
   if (state.mode !== "tutorial") showFloorNotification("starting", 2);
 }
 
@@ -879,7 +884,7 @@ function changeTutorialLesson(direction) {
   state.tutorialLesson = clamp(state.tutorialLesson + direction, 0, tutorialLessons.length - 1);
   spawnTutorialLesson();
   renderTutorialLesson();
-  setStatus(`TRAINING // ${tutorialLessons[state.tutorialLesson].title}`);
+  setStatus(`TRAINING  ▸  ${tutorialLessons[state.tutorialLesson].title}`);
 }
 
 function resetRun() {
@@ -1098,22 +1103,6 @@ function triggerKeyDown(event) {
   if (key === "r" && (state.gameOver || state.screen === "playing" || state.screen === "result")) { startMission(); return; }
   if (state.screen !== "playing") return;
 
-  if (!event.repeat && state.screen === "playing") {
-    const weaponKeys = settings.controlScheme === "classic"
-      ? {}
-      : { "1": "rifle", "2": "smg", "3": "heavy" };
-    const selectedWeapon = weaponKeys[key];
-    if (selectedWeapon) {
-      if (selectedWeapon === "pistol" || state.weaponAmmo[selectedWeapon] > 0) {
-        state.weapon = selectedWeapon;
-        setStatus(`${weaponStats[selectedWeapon].label} ready.`);
-        updateHud();
-      } else {
-        setStatus(`No ${weaponStats[selectedWeapon].label} ammo. Find a pickup first.`);
-      }
-    }
-  }
-
   if (settings.controlScheme === "classic" && key === "l" && !event.repeat) {
     shootPlayer(true);
   }
@@ -1320,7 +1309,7 @@ function updatePlayer(dt) {
     player.invuln = Math.max(player.invuln, 0.16);
     player.dashFlash = 0.18;
     player.x = clamp(player.x + player.vx * dt, 20, WIDTH - 20);
-    setStatus("WALL KICK // OPERATOR REPOSITIONED");
+    setStatus("WALL KICK  ▸  OPERATOR REPOSITIONED");
   }
   player.recoilVx *= Math.exp(-8 * dt);
   player.recoilVy *= Math.exp(-8 * dt);
@@ -1440,6 +1429,8 @@ function updateEnemies(dt) {
       enemy.summonCooldown -= dt;
       if (enemy.summonCooldown <= 0) {
         enemy.summonCooldown = 10;
+        enemy.skillTimer = 0.9;
+        enemy.skillKind = "summon";
         for (let i = 0; i < 5; i += 1) {
           const minion = createEnemy("armored");
           minion.shielded = true;
@@ -1448,7 +1439,7 @@ function updateEnemies(dt) {
           state.enemies.push(minion);
           spawnParticles(minion.x, minion.y, "#7be5ff", 8);
         }
-        setStatus("WARDEN SUMMONS // 5 SHIELDED HOSTILES DEPLOYED");
+        setStatus("WARDEN SUMMONS  ▸  5 SHIELDED HOSTILES DEPLOYED");
       }
     }
 
@@ -1484,9 +1475,12 @@ function updateEnemies(dt) {
     enemy.angle = Math.atan2(dirY, dirX);
     enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
     enemy.knifeSwing = Math.max(0, enemy.knifeSwing - dt);
+    enemy.skillTimer = Math.max(0, (enemy.skillTimer || 0) - dt);
     enemy.abilityCooldown -= dt;
     if (enemy.behavior === "teleport" && enemy.abilityCooldown <= 0 && dist < 340) {
       enemy.abilityCooldown = 4.5;
+      enemy.skillTimer = 0.55;
+      enemy.skillKind = "teleport";
       spawnParticles(enemy.x, enemy.y, enemy.color, 10);
       enemy.x = rand(160, WIDTH - 100);
       enemy.y = rand(90, HEIGHT - 100);
@@ -1498,18 +1492,32 @@ function updateEnemies(dt) {
       if (ally) {
         ally.hp = Math.min(ally.maxHp, ally.hp + 1.2);
         enemy.abilityCooldown = 2.4;
+        enemy.skillTimer = 0.65;
+        enemy.skillKind = "heal";
+        enemy.skillTargetX = ally.x;
+        enemy.skillTargetY = ally.y;
         spawnParticles(ally.x, ally.y, "#78f0a0", 5);
       }
     }
     enemy.fireCooldown -= dt;
     enemy.attackTell = ((enemy.isBoss || enemy.type === "gunner" || enemy.type === "teleporter") && enemy.fireCooldown < 0.42 && enemy.fireCooldown > 0)
       || (enemy.type === "runner" && dist < 58 && enemy.meleeCooldown < 0.24);
-    if (enemy.behavior === "explode" && dist < 70) {
-      enemy.alive = false;
-      spawnParticles(enemy.x, enemy.y, "#ff7c3d", 28);
-      state.particles.push({ x: enemy.x, y: enemy.y, radius: 8, life: 0.32, maxLife: 0.32, shockwave: true, color: "#ffb64f" });
-      if (dist < 145) hitPlayer(24 * getDifficultyStats().damage);
-      continue;
+    if (enemy.behavior === "explode") {
+      if (dist < 105 && enemy.skillKind !== "explode") {
+        enemy.skillKind = "explode";
+        enemy.skillTimer = 0.65;
+        enemy.explodeTimer = 0.65;
+      }
+      if (enemy.skillKind === "explode") {
+        enemy.explodeTimer -= dt;
+        if (enemy.explodeTimer <= 0) {
+          enemy.alive = false;
+          spawnParticles(enemy.x, enemy.y, "#ff7c3d", 28);
+          state.particles.push({ x: enemy.x, y: enemy.y, radius: 8, life: 0.32, maxLife: 0.32, shockwave: true, color: "#ffb64f" });
+          if (dist < 145) hitPlayer(24 * getDifficultyStats().damage);
+          continue;
+        }
+      }
     }
     if (enemy.type === "runner") {
       enemy.meleeCooldown = Math.max(0, enemy.meleeCooldown - dt);
@@ -1524,6 +1532,8 @@ function updateEnemies(dt) {
     const firingDistance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
     if (enemy.fireCooldown <= 0 && canFire && firingDistance < firingRange) {
       shootEnemy(enemy);
+      enemy.skillTimer = 0.22;
+      enemy.skillKind = "fire";
       enemy.fireCooldown = (enemy.isBoss ? enemy.phaseThree ? 0.9 : enemy.phaseTwo ? 1.05 : 1.55 : enemy.type === "gunner" ? 1.9 : enemy.type === "teleporter" ? 2.2 : 2.8) / (getDifficultyStats().fireRate * Math.min(state.threatScale, 1.6));
       if (enemy.isBoss && enemy.phaseTwo && !enemy.phaseThree) enemy.attackPattern = enemy.attackPattern === "fan" ? "aimed" : "fan";
     }
@@ -1581,7 +1591,7 @@ function update(dt) {
     if (state.eventTimer <= 0) {
       state.score += 300;
       const completedEvent = state.survivalEvent;
-      setStatus(`${completedEvent} SURVIVED // +300 SCORE`);
+      setStatus(`${completedEvent} SURVIVED  ▸  +300 SCORE`);
       state.survivalEvent = null;
       state.lastStandActive = false;
     }
@@ -1616,7 +1626,7 @@ function update(dt) {
     state.wave = Math.floor(state.runTime / 60) + 1;
     state.score += state.wave * 50;
     state.announcement = 2.5;
-    setStatus(`SURVIVAL MILESTONE // ${getSurvivalThreatLabel()} THREAT // +${state.wave * 50} SCORE`);
+    setStatus(`SURVIVAL MILESTONE  ▸  ${getSurvivalThreatLabel()} THREAT  ▸  +${state.wave * 50} SCORE`);
     if (state.enemies.length > 0) for (let i = 0; i < Math.min(2, state.wave); i += 1) state.enemies.push(createEnemy("runner"));
     if (state.wave % 4 === 0) triggerSurvivalEvent();
   }
@@ -1626,6 +1636,35 @@ function update(dt) {
 
 function updateArenaModifier(dt) {
   if (!state.arenaModifier) return;
+  if (state.arenaModifier.id === "crossfire") {
+    if (state.laneWarning > 0) {
+      state.laneWarning -= dt;
+      if (state.laneWarning <= 0) {
+        for (let offset = -2; offset <= 2; offset += 1) {
+          const y = clamp(state.laneY + offset * 34, 30, HEIGHT - 30);
+          state.enemyBullets.push({
+            x: state.laneDirection > 0 ? -12 : WIDTH + 12,
+            y,
+            vx: state.laneDirection * 285,
+            vy: 0,
+            radius: 7,
+            damage: 9 * getDifficultyStats().damage,
+            team: "enemy",
+          });
+        }
+        state.arenaTimer = 6.5;
+      }
+    } else {
+      state.arenaTimer -= dt;
+      if (state.arenaTimer <= 0) {
+        state.laneY = rand(95, HEIGHT - 95);
+        state.laneDirection = Math.random() < 0.5 ? 1 : -1;
+        state.laneWarning = 1.25;
+        setStatus("CROSS-LANE VOLLEY  ▸  EVADE THE MARKED SECTOR");
+      }
+    }
+    return;
+  }
   if (state.arenaModifier.id === "blackout") {
     if (state.blackoutActive > 0) state.blackoutActive = Math.max(0, state.blackoutActive - dt);
     else {
@@ -1633,7 +1672,7 @@ function updateArenaModifier(dt) {
       if (state.arenaTimer <= 0) {
         state.blackoutActive = 2;
         state.arenaTimer = 8;
-        setStatus("BLACKOUT // VISIBILITY REDUCED");
+        setStatus("BLACKOUT  ▸  VISIBILITY REDUCED");
       }
     }
     return;
@@ -1654,7 +1693,7 @@ function updateArenaModifier(dt) {
       state.hazardX = rand(150, WIDTH - 150);
       state.hazardY = rand(130, HEIGHT - 120);
       state.hazardWarning = 1.5;
-      setStatus(`${state.arenaModifier.title} // DANGER ZONE MARKED`);
+      setStatus(`${state.arenaModifier.title}  ▸  DANGER ZONE MARKED`);
     }
   }
 }
@@ -1748,6 +1787,42 @@ function drawEnemy(enemy) {
   const facing = enemy.vx < -8 ? -1 : enemy.vx > 8 ? 1 : Math.sign(Math.cos(enemy.angle)) || 1;
   const bob = Math.abs(Math.sin(gait)) * movement * (enemy.isBoss ? 2.5 : 1.8);
   ctx.translate(enemy.x, enemy.y + Math.sin(state.time * 3 + enemy.x) * movement - bob);
+  if (enemy.skillTimer > 0) {
+    const duration = enemy.skillKind === "summon" ? 0.9 : enemy.skillKind === "heal" || enemy.skillKind === "explode" ? 0.65 : enemy.skillKind === "teleport" ? 0.55 : 0.22;
+    const progress = 1 - enemy.skillTimer / duration;
+    const skillColor = enemy.skillKind === "heal" ? "#78f0a0"
+      : enemy.skillKind === "explode" ? "#ff7c3d"
+      : enemy.skillKind === "summon" ? "#7be5ff"
+        : enemy.skillKind === "teleport" ? "#d49aff" : "#ffad67";
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - progress) * 0.85;
+    ctx.strokeStyle = skillColor;
+    ctx.lineWidth = enemy.skillKind === "fire" ? 3 : 2;
+    if (enemy.skillKind === "heal") {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(enemy.skillTargetX - enemy.x, enemy.skillTargetY - enemy.y);
+      ctx.stroke();
+    }
+    const ringCount = enemy.skillKind === "summon" ? 3 : 1;
+    for (let i = 0; i < ringCount; i += 1) {
+      const ringProgress = (progress + i / ringCount) % 1;
+      ctx.globalAlpha = Math.max(0, 1 - ringProgress) * 0.8;
+      ctx.beginPath();
+      const maxRadius = enemy.skillKind === "summon" ? 88 : enemy.skillKind === "explode" ? 105 : 46;
+      ctx.arc(0, 0, 14 + ringProgress * maxRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (enemy.skillKind === "fire") {
+      ctx.globalAlpha = 0.8;
+      ctx.rotate(enemy.angle);
+      ctx.beginPath();
+      ctx.moveTo(12, 1);
+      ctx.lineTo(30 + progress * 16, 1);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   if (enemy.isBoss && enemy.phaseChangeTimer > 0) {
     const progress = 1 - enemy.phaseChangeTimer / (enemy.phaseThree ? 1.8 : 1.4);
     const pulseRadius = 38 + progress * 125;
@@ -1897,7 +1972,7 @@ function drawEnemy(enemy) {
     ctx.fillStyle = enemy.phaseThree ? "#ff5d58" : enemy.phaseTwo ? "#ff9866" : "#ffe0d7";
     ctx.font = "700 8px Orbitron, Segoe UI, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(enemy.phaseThree ? "WARDEN // PHASE III" : enemy.phaseTwo ? "WARDEN // PHASE II" : "WARDEN // PHASE I", 0, healthBarY - 5);
+    ctx.fillText(enemy.phaseThree ? "WARDEN  ▸  PHASE III" : enemy.phaseTwo ? "WARDEN  ▸  PHASE II" : "WARDEN  ▸  PHASE I", 0, healthBarY - 5);
   }
 
   ctx.restore();
@@ -2193,6 +2268,26 @@ function drawArenaBackground() {
 
 function drawArenaEffects() {
   if (!state.arenaModifier) return;
+  if (state.arenaModifier.id === "crossfire" && state.laneWarning > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.35 + Math.sin(state.time * 28) * 0.18;
+    ctx.strokeStyle = "#ff5368";
+    ctx.fillStyle = "#ff5368";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([12, 10]);
+    ctx.beginPath();
+    ctx.moveTo(0, state.laneY);
+    ctx.lineTo(WIDTH, state.laneY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(state.laneDirection > 0 ? 16 : WIDTH - 16, state.laneY);
+    ctx.lineTo(state.laneDirection > 0 ? 34 : WIDTH - 34, state.laneY - 8);
+    ctx.lineTo(state.laneDirection > 0 ? 34 : WIDTH - 34, state.laneY + 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
   if (state.hazardWarning > 0 || state.hazardActive > 0) {
     ctx.save();
     ctx.globalAlpha = state.hazardActive > 0 ? 0.45 : 0.32 + Math.sin(state.time * 22) * 0.12;
@@ -2310,7 +2405,7 @@ function updateLoadoutSummary() {
   const difficulty = state.mode === "survival"
     ? " / STARTS EASY, ESCALATES EACH FLOOR"
     : state.mode === "tower" ? ` / ${settings.difficulty.toUpperCase()} THREAT` : "";
-  document.getElementById("loadoutSummary").textContent = `${modeName}${difficulty} // WEAPONS IN FIELD`;
+  document.getElementById("loadoutSummary").textContent = `${modeName}${difficulty}  ▸  WEAPONS IN FIELD`;
   const scoreKey = state.mode === "survival" ? "sgtSurvivalBestScore" : "sgtTowerBestScore";
   document.getElementById("bestScore").textContent = String(Number(storageGet(scoreKey, "0")) || 0).padStart(6, "0");
   document.getElementById("bestScoreLabel").textContent = state.mode === "survival" ? "SURVIVAL BEST" : "TOWER BEST";
