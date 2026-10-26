@@ -46,6 +46,7 @@ const arenaModifiers = [
   { id: "overdrive", title: "WEAPON OVERDRIVE", detail: "All weapon cooldowns are reduced." },
   { id: "containment", title: "CONTAINMENT", detail: "Some hostiles deploy temporary shields." },
   { id: "crossfire", title: "CROSS-LANE VOLLEY", detail: "Marked firing lanes sweep across the arena. Break line or dodge through the gaps." },
+  { id: "surge", title: "THREAT SURGE", detail: "Hostiles briefly increase their fire rate. Watch for the warning pulse and keep moving." },
 ];
 const floorConfigs = {
   1: { title: "MOVEMENT & BASIC HOSTILES", mix: ["runner", "runner", "grunt"], detail: "tutorial" },
@@ -76,8 +77,8 @@ const tutorialLessons = [
   { title: "SPLITTER", detail: "A Splitter deploys two fast Runners when defeated. Be ready to reposition as soon as it breaks apart.", enemy: "splitter" },
   { title: "SHIELDBEARER", detail: "Shieldbearers protect enemies behind their shield. Flank them or reposition until you have a clear shot.", enemy: "shieldbearer", ally: "grunt" },
   { title: "WARDEN  ▸  PHASE 1", detail: "The Warden tracks your position and fires aimed volleys. Keep moving and watch its attack tell.", enemy: "boss", bossPhase: 1 },
-  { title: "WARDEN  ▸  PHASE 2", detail: "At 75% health, the Warden speeds up and alternates aimed shots with a spread. Move through the gaps.", enemy: "boss", bossPhase: 2 },
-  { title: "WARDEN  ▸  PHASE 3", detail: "Below 30% health, the Warden fires a wider spread. Stay mobile and dash through a safe gap.", enemy: "boss", bossPhase: 3 },
+  { title: "WARDEN  ▸  PHASE 2", detail: "At 75% health, the Warden alternates aimed shots with a radial nova. Read the charge and move through the gaps.", enemy: "boss", bossPhase: 2 },
+  { title: "WARDEN  ▸  PHASE 3", detail: "Below 30% health, the Warden marks your position for bombardment. Keep moving and escape each impact zone.", enemy: "boss", bossPhase: 3 },
 ];
 const towerFloorEnemyCounts = [0, 5, 7, 9, 11, 13, 1, 11, 13, 15, 17, 4];
 function storageGet(key, fallback = null) { try { return localStorage.getItem(key) ?? fallback; } catch (_) { return fallback; } }
@@ -114,6 +115,10 @@ const state = {
   weapon: "pistol",
   victory: false,
   shakeTimer: 0,
+  shakeDuration: 0,
+  shakeStrength: 0,
+  shakeBiasX: 0,
+  shakeBiasY: 0,
   floor: 1,
   enemies: [],
   bullets: [],
@@ -153,6 +158,10 @@ const state = {
   laneWarning: 0,
   laneY: 0,
   laneDirection: 1,
+  surgeWarning: 0,
+  surgeActive: 0,
+  bombTimer: 0,
+  bombZones: [],
   blackoutActive: 0,
   survivalEvent: null,
   eventTimer: 0,
@@ -212,18 +221,21 @@ function damageEnemy(enemy, damage, x, y, particleColor = "#9ae6ff", weaponType 
   playTone(damage >= 3 ? 120 : 250, 0.035, "square", 0.008);
   if (enemy.isBoss && !enemy.phaseTwo && enemy.hp <= enemy.maxHp * 0.75) {
     enemy.phaseTwo = true;
-    enemy.speed *= 1.25;
+    enemy.speed *= isHardFloorSixWarden() ? 1.2 : 1.25;
     enemy.fireCooldown = 0.15;
     enemy.phaseChangeTimer = 1.4;
+    triggerScreenShake(5, 0.28, enemy.x, enemy.y);
     setStatus("WARDEN PHASE 2  ▸  75%  ▸  SPEED AND FIRE RATE INCREASED");
     state.announcement = 2.5;
   }
   if (enemy.isBoss && enemy.phaseTwo && !enemy.phaseThree && enemy.hp <= enemy.maxHp * 0.3) {
     enemy.phaseThree = true;
-    enemy.speed *= 1.1;
+    enemy.speed *= isHardFloorSixWarden() ? 1.06 : 1.1;
     enemy.attackPattern = "fan";
     enemy.fireCooldown = 0.25;
     enemy.phaseChangeTimer = 1.8;
+    enemy.bossSkillCooldown = 1.5;
+    triggerScreenShake(8, 0.38, enemy.x, enemy.y);
     setStatus("WARDEN PHASE 3  ▸  30%  ▸  LAST STAND");
     state.announcement = 3;
   }
@@ -256,9 +268,10 @@ function damageEnemy(enemy, damage, x, y, particleColor = "#9ae6ff", weaponType 
         fragment.y = clamp(enemy.y + rand(-22, 22), 20, HEIGHT - 40);
         state.enemies.push(fragment);
       }
+      triggerScreenShake(3.5, 0.18, enemy.x, enemy.y);
       setStatus("SPLITTER  ▸  TWO RUNNERS DEPLOYED");
     }
-    if (enemy.isBoss) { state.score += 250; state.shakeTimer = Math.max(state.shakeTimer, 0.45); state.slowMo = 0.75; playTone(75, 0.45, "sawtooth", 0.07); }
+    if (enemy.isBoss) { state.score += 250; triggerScreenShake(10, 0.48, enemy.x, enemy.y); state.slowMo = 0.75; playTone(75, 0.45, "sawtooth", 0.07); }
     if (state.killStreak >= 10) setStatus(`KILLING SPREE  ▸  ${state.killStreak} HOSTILES  ▸  x${comboMultiplier.toFixed(1)}`);
     else if (state.killStreak >= 3) setStatus(`${state.killStreak}X COMBO  ▸  +${scoreBonus} SCORE`);
     else setStatus(enemy.isBoss ? "TARGET ELIMINATED  ▸  BOSS DOWN!" : "Enemy down.");
@@ -267,6 +280,9 @@ function damageEnemy(enemy, damage, x, y, particleColor = "#9ae6ff", weaponType 
 
 function explodeRocket(rocket) {
   const blastRadius = 120;
+  const distanceToPlayer = Math.hypot(player.x - rocket.x, player.y - rocket.y);
+  const proximity = clamp(1 - distanceToPlayer / 520, 0, 1);
+  triggerScreenShake(3 + proximity * 12, 0.3 + proximity * 0.24, rocket.x, rocket.y);
   const previousKills = state.enemiesDefeated;
   spawnParticles(rocket.x, rocket.y, "#ffb266", 30);
   state.particles.push({ x: rocket.x, y: rocket.y, radius: 12, life: 0.38, maxLife: 0.38, shockwave: true, color: "#ffb64f" });
@@ -287,6 +303,23 @@ function rand(min, max) {
 
 function setStatus(message) {
   statusText.textContent = message;
+}
+
+function triggerScreenShake(strength, duration, sourceX, sourceY) {
+  if (!settings.shake) return;
+  const incomingStrength = clamp(strength, 0, 18);
+  const previousStrength = state.shakeTimer > 0 ? state.shakeStrength : 0;
+  if (sourceX !== undefined && sourceY !== undefined) {
+    const dx = player.x - sourceX;
+    const dy = player.y - sourceY;
+    const distance = Math.hypot(dx, dy) || 1;
+    const weight = previousStrength + incomingStrength || 1;
+    state.shakeBiasX = (state.shakeBiasX * previousStrength + dx / distance * incomingStrength) / weight;
+    state.shakeBiasY = (state.shakeBiasY * previousStrength + dy / distance * incomingStrength) / weight;
+  }
+  state.shakeStrength = Math.min(18, Math.hypot(previousStrength, incomingStrength));
+  state.shakeTimer = Math.max(state.shakeTimer, duration);
+  state.shakeDuration = Math.max(state.shakeDuration, duration);
 }
 
 const achievementDefinitions = [
@@ -391,6 +424,51 @@ function getDifficultyStats() {
     };
   }
   return state.mode === "tower" ? towerDifficultyStats[settings.difficulty] : survivalDifficultyStats.normal;
+}
+
+function getWardenDifficultyProfile() {
+  const difficulty = state.mode === "survival"
+    ? state.floor <= 1 ? "easy" : state.floor === 2 ? "normal" : "hard"
+    : settings.difficulty;
+  const profiles = {
+    easy: {
+      novaCooldown: 12, novaWarning: 1.2, novaShots: 6, novaDamage: 7, novaSpeed: 225,
+      barrageCooldown: 13, barrageCharge: 1.35, barrageCount: 1, barrageWarning: 1.65, barrageDamage: 12, barrageRadius: 82,
+      summonCooldown: 14, summonCount: 3, summonShieldChance: 0.1, fanOffsets: [-0.24, 0, 0.24],
+    },
+    normal: {
+      novaCooldown: 9.5, novaWarning: 1, novaShots: 8, novaDamage: 9, novaSpeed: 250,
+      barrageCooldown: 10.5, barrageCharge: 1.1, barrageCount: 2, barrageWarning: 1.4, barrageDamage: 16, barrageRadius: 96,
+      summonCooldown: 10, summonCount: 4, summonShieldChance: 0.2, fanOffsets: [-0.34, -0.17, 0, 0.17, 0.34],
+    },
+    hard: {
+      novaCooldown: 7.5, novaWarning: 0.82, novaShots: 10, novaDamage: 11, novaSpeed: 280,
+      barrageCooldown: 8, barrageCharge: 0.9, barrageCount: 3, barrageWarning: 1.1, barrageDamage: 20, barrageRadius: 108,
+      summonCooldown: 8, summonCount: 5, summonShieldChance: 0.32, fanOffsets: [-0.48, -0.32, -0.16, 0, 0.16, 0.32, 0.48],
+    },
+  };
+  const profile = profiles[difficulty] || profiles.normal;
+  if (state.mode === "tower" && state.floor === 6 && settings.difficulty === "hard") {
+    return {
+      ...profile,
+      novaCooldown: profile.novaCooldown * 1.1,
+      novaWarning: profile.novaWarning + 0.08,
+      novaShots: 10,
+      novaDamage: profile.novaDamage * 0.92,
+      barrageCooldown: profile.barrageCooldown * 1.1,
+      barrageCharge: profile.barrageCharge + 0.08,
+      barrageCount: 3,
+      barrageWarning: profile.barrageWarning + 0.08,
+      barrageDamage: profile.barrageDamage * 0.92,
+      barrageRadius: profile.barrageRadius * 0.94,
+      fanOffsets: [-0.42, -0.28, -0.14, 0, 0.14, 0.28, 0.42],
+    };
+  }
+  return profile;
+}
+
+function isHardFloorSixWarden() {
+  return state.mode === "tower" && state.floor === 6 && settings.difficulty === "hard";
 }
 
 function getSurvivalThreatLabel() {
@@ -590,11 +668,13 @@ function performDash() {
   player.dashCooldown = 0.8;
   player.invuln = 0.25;
   player.dashFlash = 0.24;
+  triggerScreenShake(2.2, 0.13, player.x - directionX * 24, player.y - directionY * 24);
   spawnParticles(player.x, player.y, "#9be7ff", 12);
   if (nearProjectile) {
     state.perfectDodges += 1;
     state.slowMo = 0.45;
     state.score += 100;
+    triggerScreenShake(3.8, 0.2);
     setStatus("PERFECT DODGE  ▸  +100 SCORE");
     playTone(680, 0.12, "triangle", 0.04);
   } else setStatus("Dash burst.");
@@ -666,7 +746,7 @@ function createEnemy(forcedType = null) {
     y: rand(110, HEIGHT - 110),
     width: boss ? 38 : type === "armored" ? 24 : 18,
     height: boss ? 84 : 54,
-    speed: profile.speed * difficulty.speed * Math.min(scale, 1.5),
+    speed: profile.speed * difficulty.speed * Math.min(scale, 1.5) * (boss && isHardFloorSixWarden() ? 0.96 : 1),
     vx: rand(-60, 60), vy: rand(-45, 45),
     hp, maxHp: hp,
     fireCooldown: rand(profile.cooldown * 0.75, profile.cooldown * 1.35) / (difficulty.fireRate * Math.min(scale, 1.65)),
@@ -674,11 +754,18 @@ function createEnemy(forcedType = null) {
     type, behavior: profile.behavior, color: elite ? "#ffe46b" : profile.color, elite,
     hitFlash: 0, phaseTwo: false, phaseThree: false, phaseChangeTimer: 0, explodeTimer: 0,
     skillTimer: 0, skillKind: "", skillTargetX: 0, skillTargetY: 0,
-    summonCooldown: boss ? 10 : 0,
+    signatureCooldown: type === "gunner" ? rand(3.5, 5.5) : type === "shieldbearer" ? rand(4, 6) : type === "grunt" ? rand(3.5, 5) : type === "armored" ? rand(4, 6) : 0,
+    signatureTimer: 0, signatureAngle: 0, rushTimer: 0, rushHit: false,
+    summonCooldown: boss ? getWardenDifficultyProfile().summonCooldown : 0,
     abilityCooldown: type === "teleporter" ? 3 : type === "medic" ? 2.2 : 0,
     meleeCooldown: type === "runner" ? rand(0.25, 0.7) : 0,
     knifeSwing: 0,
     attackPattern: "aimed",
+    bossSkillCooldown: 5,
+    bossSkillTimer: 0,
+    bossSkillKind: "",
+    bossSkillTargetX: 0,
+    bossSkillTargetY: 0,
     alive: true,
     angle: 0,
   };
@@ -814,6 +901,10 @@ function buildLevel() {
   state.laneWarning = 0;
   state.laneY = 0;
   state.laneDirection = Math.random() < 0.5 ? 1 : -1;
+  state.surgeWarning = 0;
+  state.surgeActive = 0;
+  state.bombTimer = state.mode === "tutorial" ? 0 : 6;
+  state.bombZones = [];
 
   const config = state.mode === "tutorial"
     ? { title: "TRAINING SIMULATION", mix: [] }
@@ -915,6 +1006,10 @@ function resetRun() {
   state.time = 0;
   state.runTime = 0;
   state.shakeTimer = 0;
+  state.shakeDuration = 0;
+  state.shakeStrength = 0;
+  state.shakeBiasX = 0;
+  state.shakeBiasY = 0;
   player.x = 120;
   player.y = 360;
   player.maxHp = 100;
@@ -962,7 +1057,7 @@ function hitPlayer(amount) {
   player.hitFlash = 0.2;
   const knockSource = state.enemies.filter(enemy => enemy.alive).sort((a, b) => Math.hypot(player.x - a.x, player.y - a.y) - Math.hypot(player.x - b.x, player.y - b.y))[0];
   if (knockSource) { const angle = Math.atan2(player.y - knockSource.y, player.x - knockSource.x); state.damageDirection = angle; player.vx += Math.cos(angle) * 180; player.vy += Math.sin(angle) * 140; }
-  if (settings.shake) state.shakeTimer = 0.16;
+  triggerScreenShake(4, 0.2, knockSource?.x, knockSource?.y);
   playTone(105, 0.12, "sawtooth", 0.045);
   spawnParticles(player.x, player.y, "#ff8c8c", 16);
   if (player.hp <= 0) {
@@ -1005,6 +1100,7 @@ function shootPlayer(useRocket = false, selectedWeapon = state.weapon) {
       rocket: true,
     });
     applyPlayerRecoil(aimX, aimY, 110);
+    triggerScreenShake(2, 0.12, player.x - aimX * 24, player.y - aimY * 24);
     player.gunFlash = 0.12;
     setStatus(`Rocket fired. ${player.rocketCount} left.`);
     updateHud();
@@ -1057,9 +1153,7 @@ function shootEnemy(enemy) {
   const lead = Math.min(0.35, dist / 900);
   const aimAngle = Math.atan2(dy + player.vy * lead, dx + player.vx * lead) + rand(-0.09, 0.09);
   const fan = enemy.isBoss && enemy.phaseTwo && enemy.attackPattern === "fan";
-  const spread = fan
-    ? enemy.phaseThree ? [-0.32, -0.16, 0, 0.16, 0.32] : [-0.34, -0.17, 0, 0.17, 0.34]
-    : [0];
+  const spread = fan ? getWardenDifficultyProfile().fanOffsets : [0];
   for (const offset of spread) {
     const angle = aimAngle + offset;
     const speed = enemy.isBoss ? 300 : 235;
@@ -1069,9 +1163,81 @@ function shootEnemy(enemy) {
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       radius: enemy.isBoss ? 6 : 5,
-        damage: (enemy.isBoss ? 12 * (enemy.phaseThree ? 1.2 : enemy.phaseTwo ? 1.25 : 1) : enemy.type === "gunner" ? 7 : 8) * getDifficultyStats().damage * Math.min(state.threatScale, 1.4) * (state.lastStandActive ? 1.25 : 1),
+        damage: (enemy.isBoss ? 12 * (enemy.phaseThree ? 1.2 : enemy.phaseTwo ? 1.25 : 1) : enemy.type === "gunner" ? 7 : 8) * getDifficultyStats().damage * Math.min(state.threatScale, 1.4) * (state.lastStandActive ? 1.25 : 1) * (enemy.isBoss && isHardFloorSixWarden() ? 0.92 : 1),
       team: "enemy",
     });
+  }
+}
+
+function fireWardenNova(enemy, profile) {
+  const startAngle = Math.atan2(player.y - enemy.y, player.x - enemy.x) + Math.PI / profile.novaShots;
+  for (let i = 0; i < profile.novaShots; i += 1) {
+    const angle = startAngle + (Math.PI * 2 * i) / profile.novaShots;
+    state.enemyBullets.push({
+      x: enemy.x + Math.cos(angle) * 30,
+      y: enemy.y + Math.sin(angle) * 30,
+      vx: Math.cos(angle) * profile.novaSpeed,
+      vy: Math.sin(angle) * profile.novaSpeed,
+      radius: 6,
+      damage: profile.novaDamage,
+      team: "enemy",
+      bossNova: true,
+    });
+  }
+  setStatus("WARDEN NOVA  ▸  RADIAL VOLLEY RELEASED");
+  triggerScreenShake(6, 0.3, enemy.x, enemy.y);
+  playTone(110, 0.24, "sawtooth", 0.04);
+}
+
+function updateWardenSkills(enemy, dt) {
+  if (!enemy.isBoss || !enemy.phaseTwo || enemy.phaseChangeTimer > 0) return;
+  const profile = getWardenDifficultyProfile();
+  if (enemy.bossSkillTimer > 0) {
+    enemy.bossSkillTimer = Math.max(0, enemy.bossSkillTimer - dt);
+    if (enemy.bossSkillTimer === 0) {
+      if (enemy.bossSkillKind === "nova") {
+        fireWardenNova(enemy, profile);
+      } else if (enemy.bossSkillKind === "barrage") {
+        const offsets = profile.barrageCount === 1
+          ? [{ x: 0, y: 0 }]
+          : profile.barrageCount === 2
+            ? [{ x: -54, y: -30 }, { x: 54, y: 30 }]
+            : [{ x: -76, y: 42 }, { x: 0, y: -34 }, { x: 76, y: 42 }];
+        for (const offset of offsets) {
+          state.bombZones.push({
+            x: clamp(enemy.bossSkillTargetX + offset.x, 130, WIDTH - 130),
+            y: clamp(enemy.bossSkillTargetY + offset.y, 100, HEIGHT - 100),
+            warning: profile.barrageWarning,
+            warningDuration: profile.barrageWarning,
+            active: 0,
+            radius: profile.barrageRadius,
+            damage: profile.barrageDamage,
+            fromBoss: true,
+          });
+        }
+        setStatus(`WARDEN BOMBARDMENT  ▸  ${profile.barrageCount} IMPACT ZONE${profile.barrageCount > 1 ? "S" : ""}`);
+        playTone(85, 0.3, "sawtooth", 0.05);
+      }
+      enemy.bossSkillKind = "";
+    }
+    return;
+  }
+
+  enemy.bossSkillCooldown -= dt;
+  if (enemy.bossSkillCooldown > 0) return;
+  if (enemy.phaseThree) {
+    enemy.bossSkillKind = "barrage";
+    enemy.bossSkillTimer = profile.barrageCharge;
+    enemy.bossSkillCooldown = profile.barrageCooldown;
+    enemy.bossSkillTargetX = player.x;
+    enemy.bossSkillTargetY = player.y;
+    setStatus("WARDEN TARGET LOCK  ▸  MOVE BEFORE IMPACT");
+    triggerScreenShake(3.5, 0.2, enemy.x, enemy.y);
+  } else {
+    enemy.bossSkillKind = "nova";
+    enemy.bossSkillTimer = profile.novaWarning;
+    enemy.bossSkillCooldown = profile.novaCooldown;
+    setStatus("WARDEN NOVA CHARGING  ▸  PREPARE TO DODGE");
   }
 }
 
@@ -1309,6 +1475,7 @@ function updatePlayer(dt) {
     player.invuln = Math.max(player.invuln, 0.16);
     player.dashFlash = 0.18;
     player.x = clamp(player.x + player.vx * dt, 20, WIDTH - 20);
+    triggerScreenShake(2.8, 0.15, player.x - Math.sign(player.vx) * 24, player.y + 20);
     setStatus("WALL KICK  ▸  OPERATOR REPOSITIONED");
   }
   player.recoilVx *= Math.exp(-8 * dt);
@@ -1389,7 +1556,7 @@ function updateBullets(dt) {
         } else {
           damageEnemy(enemy, bullet.damage, bullet.x, bullet.y, bullet.weapon === "heavy" ? "#ffb46b" : "#9ae6ff", bullet.weapon);
           spawnParticles(bullet.x, bullet.y, bullet.impact === "burst" ? "#ffb46b" : "#e9fbff", bullet.impact === "burst" ? 14 : 5);
-          if (bullet.impact === "burst" && settings.shake) state.shakeTimer = Math.max(state.shakeTimer, 0.14);
+          if (bullet.impact === "burst") triggerScreenShake(2.8, 0.14, bullet.x, bullet.y);
       
         }
         state.bullets.splice(i, 1);
@@ -1426,20 +1593,23 @@ function updateEnemies(dt) {
     alive += 1;
 
     if (enemy.isBoss && state.mode === "tower" && state.floor === 11) {
+      const wardenProfile = getWardenDifficultyProfile();
       enemy.summonCooldown -= dt;
       if (enemy.summonCooldown <= 0) {
-        enemy.summonCooldown = 10;
+        enemy.summonCooldown = wardenProfile.summonCooldown;
         enemy.skillTimer = 0.9;
         enemy.skillKind = "summon";
-        for (let i = 0; i < 5; i += 1) {
-          const minion = createEnemy("armored");
-          minion.shielded = true;
+        const summonTypes = ["grunt", "runner", "gunner", "armored", "exploder", "medic", "teleporter", "splitter", "shieldbearer"];
+        for (let i = 0; i < wardenProfile.summonCount; i += 1) {
+          const summonType = summonTypes[Math.floor(Math.random() * summonTypes.length)];
+          const minion = createEnemy(summonType);
+          minion.shielded = Math.random() < wardenProfile.summonShieldChance;
           minion.x = clamp(enemy.x + rand(-130, 130), 30, WIDTH - 30);
           minion.y = clamp(enemy.y + rand(-100, 100), 20, HEIGHT - 40);
           state.enemies.push(minion);
-          spawnParticles(minion.x, minion.y, "#7be5ff", 8);
+          spawnParticles(minion.x, minion.y, minion.shielded ? "#7be5ff" : minion.color, 8);
         }
-        setStatus("WARDEN SUMMONS  ▸  5 SHIELDED HOSTILES DEPLOYED");
+        setStatus(`WARDEN SUMMONS  ▸  ${wardenProfile.summonCount} RANDOM HOSTILES DEPLOYED`);
       }
     }
 
@@ -1448,8 +1618,79 @@ function updateEnemies(dt) {
     const dist = Math.hypot(dirX, dirY) || 1;
     const canFire = enemy.type === "gunner" || enemy.type === "teleporter" || enemy.type === "shieldbearer" || enemy.isBoss || enemy.type === "grunt" || enemy.type === "armored";
     enemy.phaseChangeTimer = Math.max(0, (enemy.phaseChangeTimer || 0) - dt);
+    updateWardenSkills(enemy, dt);
+    enemy.signatureCooldown = Math.max(0, (enemy.signatureCooldown || 0) - dt);
+    let signatureResolved = false;
+    if (enemy.signatureTimer > 0) {
+      enemy.signatureTimer = Math.max(0, enemy.signatureTimer - dt);
+      if (enemy.signatureTimer === 0) {
+        signatureResolved = true;
+        if (enemy.type === "gunner") {
+          const angle = enemy.signatureAngle;
+          state.enemyBullets.push({
+            x: enemy.x + Math.cos(angle) * 22,
+            y: enemy.y + Math.sin(angle) * 22,
+            vx: Math.cos(angle) * 390,
+            vy: Math.sin(angle) * 390,
+            radius: 8,
+            damage: 16 * getDifficultyStats().damage * Math.min(state.threatScale, 1.4),
+            team: "enemy",
+            charged: true,
+          });
+          enemy.skillTimer = 0.38;
+          enemy.skillKind = "charged";
+          playTone(160, 0.08, "sawtooth", 0.025);
+        } else if (enemy.type === "shieldbearer" || enemy.type === "grunt") {
+          enemy.rushTimer = enemy.type === "shieldbearer" ? 0.55 : 0.38;
+          enemy.rushHit = false;
+          enemy.skillTimer = enemy.rushTimer;
+          enemy.skillKind = enemy.type === "shieldbearer" ? "rush" : "lunge";
+        } else if (enemy.type === "armored") {
+          enemy.skillTimer = 0.55;
+          enemy.skillKind = "slam";
+          spawnParticles(enemy.x, enemy.y, "#c5a6ff", 22);
+          state.particles.push({ x: enemy.x, y: enemy.y, radius: 12, life: 0.34, maxLife: 0.34, shockwave: true, color: "#c5a6ff" });
+          triggerScreenShake(7, 0.3, enemy.x, enemy.y);
+          if (Math.hypot(player.x - enemy.x, player.y - enemy.y) < 132) {
+            hitPlayer(20 * getDifficultyStats().damage);
+          }
+        }
+      }
+    }
+    if (enemy.type === "gunner" && enemy.signatureCooldown === 0 && enemy.signatureTimer === 0 && dist < 620) {
+      enemy.signatureCooldown = 7.5;
+      enemy.signatureTimer = 0.9;
+      enemy.signatureAngle = Math.atan2(dirY + player.vy * 0.12, dirX + player.vx * 0.12);
+      enemy.skillKind = "charge";
+      setStatus("GUNNER CHARGING  ▸  BREAK THE FIRING LINE");
+    } else if (enemy.type === "shieldbearer" && enemy.signatureCooldown === 0 && enemy.signatureTimer === 0 && dist > 110 && dist < 350) {
+      enemy.signatureCooldown = 8;
+      enemy.signatureTimer = 0.72;
+      enemy.signatureAngle = Math.atan2(dirY, dirX);
+      enemy.skillKind = "shieldCharge";
+      setStatus("SHIELDBEARER RUSH  ▸  DODGE THE CHARGE");
+    } else if (enemy.type === "grunt" && enemy.signatureCooldown === 0 && enemy.signatureTimer === 0 && dist > 90 && dist < 260) {
+      enemy.signatureCooldown = 6.5;
+      enemy.signatureTimer = 0.6;
+      enemy.signatureAngle = Math.atan2(dirY, dirX);
+      enemy.skillKind = "lungeCharge";
+      setStatus("GRUNT LUNGE  ▸  EVADE THE ADVANCE");
+    } else if (enemy.type === "armored" && enemy.signatureCooldown === 0 && enemy.signatureTimer === 0 && dist < 185) {
+      enemy.signatureCooldown = 7.5;
+      enemy.signatureTimer = 0.85;
+      enemy.skillKind = "slamCharge";
+      setStatus("ARMORED SLAM  ▸  MOVE OUT OF RANGE");
+    }
 
-    if (enemy.behavior === "keep-distance" || enemy.behavior === "medic") {
+    if (enemy.rushTimer > 0) {
+      enemy.rushTimer = Math.max(0, enemy.rushTimer - dt);
+      const rushSpeed = enemy.type === "grunt" ? 2.7 : 3.6;
+      enemy.vx = Math.cos(enemy.signatureAngle) * enemy.speed * rushSpeed;
+      enemy.vy = Math.sin(enemy.signatureAngle) * enemy.speed * rushSpeed;
+    } else if (enemy.signatureTimer > 0) {
+      enemy.vx *= 0.86;
+      enemy.vy *= 0.86;
+    } else if (enemy.behavior === "keep-distance" || enemy.behavior === "medic") {
       const desired = enemy.behavior === "medic" ? 300 : 390;
       const approach = dist > desired + 45 ? 1 : dist < desired - 45 ? -1 : 0;
       enemy.vx += (dirX / dist) * approach * 105 * dt;
@@ -1461,7 +1702,7 @@ function updateEnemies(dt) {
     }
     enemy.vx *= 0.986; enemy.vy *= 0.986;
     const speed = Math.hypot(enemy.vx, enemy.vy);
-    const maxSpeed = enemy.speed * (state.lastStandActive ? 1.15 : 1);
+    const maxSpeed = enemy.speed * (enemy.rushTimer > 0 ? enemy.type === "grunt" ? 2.7 : 3.6 : state.lastStandActive ? 1.15 : 1);
     if (speed > maxSpeed) { enemy.vx = enemy.vx / speed * maxSpeed; enemy.vy = enemy.vy / speed * maxSpeed; }
     enemy.x += enemy.vx * dt;
     enemy.y += enemy.vy * dt;
@@ -1471,6 +1712,10 @@ function updateEnemies(dt) {
 
     enemy.x = clamp(enemy.x, 30, WIDTH - 30);
     enemy.y = clamp(enemy.y, 20, HEIGHT - 40);
+    if (enemy.rushTimer > 0 && !enemy.rushHit && Math.hypot(player.x - enemy.x, player.y - enemy.y) < 48) {
+      enemy.rushHit = true;
+      hitPlayer((enemy.type === "grunt" ? 11 : 18) * getDifficultyStats().damage);
+    }
 
     enemy.angle = Math.atan2(dirY, dirX);
     enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
@@ -1481,6 +1726,7 @@ function updateEnemies(dt) {
       enemy.abilityCooldown = 4.5;
       enemy.skillTimer = 0.55;
       enemy.skillKind = "teleport";
+      triggerScreenShake(2.6, 0.17, enemy.x, enemy.y);
       spawnParticles(enemy.x, enemy.y, enemy.color, 10);
       enemy.x = rand(160, WIDTH - 100);
       enemy.y = rand(90, HEIGHT - 100);
@@ -1499,7 +1745,7 @@ function updateEnemies(dt) {
         spawnParticles(ally.x, ally.y, "#78f0a0", 5);
       }
     }
-    enemy.fireCooldown -= dt;
+    enemy.fireCooldown -= dt * (state.surgeActive > 0 ? 1.8 : 1);
     enemy.attackTell = ((enemy.isBoss || enemy.type === "gunner" || enemy.type === "teleporter") && enemy.fireCooldown < 0.42 && enemy.fireCooldown > 0)
       || (enemy.type === "runner" && dist < 58 && enemy.meleeCooldown < 0.24);
     if (enemy.behavior === "explode") {
@@ -1515,6 +1761,8 @@ function updateEnemies(dt) {
           spawnParticles(enemy.x, enemy.y, "#ff7c3d", 28);
           state.particles.push({ x: enemy.x, y: enemy.y, radius: 8, life: 0.32, maxLife: 0.32, shockwave: true, color: "#ffb64f" });
           if (dist < 145) hitPlayer(24 * getDifficultyStats().damage);
+          const proximity = clamp(1 - Math.hypot(player.x - enemy.x, player.y - enemy.y) / 260, 0, 1);
+          triggerScreenShake(3 + proximity * 9, 0.28 + proximity * 0.18, enemy.x, enemy.y);
           continue;
         }
       }
@@ -1530,11 +1778,11 @@ function updateEnemies(dt) {
     }
     const firingRange = enemy.type === "gunner" ? 620 : enemy.isBoss ? 700 : 560;
     const firingDistance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-    if (enemy.fireCooldown <= 0 && canFire && firingDistance < firingRange) {
+    if (enemy.fireCooldown <= 0 && canFire && firingDistance < firingRange && enemy.signatureTimer === 0 && !signatureResolved) {
       shootEnemy(enemy);
       enemy.skillTimer = 0.22;
       enemy.skillKind = "fire";
-      enemy.fireCooldown = (enemy.isBoss ? enemy.phaseThree ? 0.9 : enemy.phaseTwo ? 1.05 : 1.55 : enemy.type === "gunner" ? 1.9 : enemy.type === "teleporter" ? 2.2 : 2.8) / (getDifficultyStats().fireRate * Math.min(state.threatScale, 1.6));
+      enemy.fireCooldown = (enemy.isBoss ? enemy.phaseThree ? 0.9 : enemy.phaseTwo ? 1.05 : 1.55 : enemy.type === "gunner" ? 1.9 : enemy.type === "teleporter" ? 2.2 : 2.8) / (getDifficultyStats().fireRate * Math.min(state.threatScale, 1.6)) * (enemy.isBoss && isHardFloorSixWarden() ? 1.08 : 1);
       if (enemy.isBoss && enemy.phaseTwo && !enemy.phaseThree) enemy.attackPattern = enemy.attackPattern === "fan" ? "aimed" : "fan";
     }
 
@@ -1621,6 +1869,7 @@ function update(dt) {
   updatePlayer(dt);
   updateBullets(dt);
   updateEnemies(dt);
+  updateBombardment(dt);
   updateParticles(dt);
   if (state.mode === "survival" && state.runTime > 0 && Math.floor(state.runTime / 60) > state.wave - 1) {
     state.wave = Math.floor(state.runTime / 60) + 1;
@@ -1636,6 +1885,25 @@ function update(dt) {
 
 function updateArenaModifier(dt) {
   if (!state.arenaModifier) return;
+  if (state.arenaModifier.id === "surge") {
+    if (state.surgeWarning > 0) {
+      state.surgeWarning -= dt;
+      if (state.surgeWarning <= 0) {
+        state.surgeActive = 3.5;
+        setStatus("THREAT SURGE  ▸  HOSTILE FIRE RATE INCREASED");
+      }
+    } else if (state.surgeActive > 0) {
+      state.surgeActive = Math.max(0, state.surgeActive - dt);
+      if (state.surgeActive === 0) state.arenaTimer = 7;
+    } else {
+      state.arenaTimer -= dt;
+      if (state.arenaTimer <= 0) {
+        state.surgeWarning = 1.4;
+        setStatus("THREAT SURGE INCOMING  ▸  REPOSITION");
+      }
+    }
+    return;
+  }
   if (state.arenaModifier.id === "crossfire") {
     if (state.laneWarning > 0) {
       state.laneWarning -= dt;
@@ -1682,6 +1950,7 @@ function updateArenaModifier(dt) {
     state.hazardWarning -= dt;
     if (state.hazardWarning <= 0) {
       state.hazardActive = 0.7;
+      triggerScreenShake(5, 0.24, state.hazardX, state.hazardY);
       if (Math.hypot(player.x - state.hazardX, player.y - state.hazardY) < 95) hitPlayer(18);
     }
   } else if (state.hazardActive > 0) {
@@ -1694,6 +1963,49 @@ function updateArenaModifier(dt) {
       state.hazardY = rand(130, HEIGHT - 120);
       state.hazardWarning = 1.5;
       setStatus(`${state.arenaModifier.title}  ▸  DANGER ZONE MARKED`);
+    }
+  }
+}
+
+function updateBombardment(dt) {
+  if (state.mode !== "tutorial" && state.floor >= 3 && !state.gameOver && !state.levelCleared) {
+    state.bombTimer -= dt;
+    if (state.bombTimer <= 0) {
+      const bombCount = Math.min(3, 1 + Math.floor((state.floor - 3) / 3));
+      for (let i = 0; i < bombCount; i += 1) {
+        state.bombZones.push({
+          x: rand(130, WIDTH - 130),
+          y: rand(100, HEIGHT - 100),
+          warning: 1.6,
+          warningDuration: 1.6,
+          active: 0,
+          radius: Math.min(112, 88 + state.floor * 2),
+        });
+      }
+      state.bombTimer = Math.max(4.5, 12 - (state.floor - 3) * 0.7);
+      setStatus(`INCOMING BOMBARDMENT  ▸  ${bombCount} IMPACT ZONE${bombCount > 1 ? "S" : ""} MARKED`);
+    }
+  }
+
+  for (let i = state.bombZones.length - 1; i >= 0; i -= 1) {
+    const zone = state.bombZones[i];
+    if (zone.warning > 0) {
+      zone.warning = Math.max(0, zone.warning - dt);
+      if (zone.warning === 0) {
+        zone.active = 0.42;
+        if (Math.hypot(player.x - zone.x, player.y - zone.y) < zone.radius) {
+          hitPlayer(zone.damage ?? 16 * getDifficultyStats().damage);
+        }
+        const distanceToPlayer = Math.hypot(player.x - zone.x, player.y - zone.y);
+        const proximity = clamp(1 - distanceToPlayer / 560, 0, 1);
+        triggerScreenShake(4 + proximity * 13, 0.36 + proximity * 0.24, zone.x, zone.y);
+        spawnParticles(zone.x, zone.y, "#ff7047", 24);
+        state.particles.push({ x: zone.x, y: zone.y, radius: 12, life: 0.38, maxLife: 0.38, shockwave: true, color: "#ff7047" });
+      }
+    } else if (zone.active > 0) {
+      zone.active = Math.max(0, zone.active - dt);
+    } else {
+      state.bombZones.splice(i, 1);
     }
   }
 }
@@ -1787,13 +2099,46 @@ function drawEnemy(enemy) {
   const facing = enemy.vx < -8 ? -1 : enemy.vx > 8 ? 1 : Math.sign(Math.cos(enemy.angle)) || 1;
   const bob = Math.abs(Math.sin(gait)) * movement * (enemy.isBoss ? 2.5 : 1.8);
   ctx.translate(enemy.x, enemy.y + Math.sin(state.time * 3 + enemy.x) * movement - bob);
+  if (enemy.signatureTimer > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.35 + Math.sin(state.time * 28) * 0.2;
+    ctx.strokeStyle = enemy.type === "gunner" ? "#ffe38c" : enemy.type === "armored" ? "#c5a6ff" : enemy.type === "grunt" ? "#ff7268" : "#80b6ff";
+    ctx.lineWidth = enemy.type === "gunner" ? 2 : enemy.type === "armored" ? 3 : 5;
+    if (enemy.type === "armored") {
+      ctx.beginPath();
+      ctx.arc(0, 0, 132, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.rotate(enemy.signatureAngle);
+      ctx.setLineDash(enemy.type === "gunner" ? [10, 8] : []);
+      ctx.beginPath();
+      ctx.moveTo(10, enemy.type === "shieldbearer" ? 22 : 0);
+      ctx.lineTo(enemy.type === "gunner" ? 700 : enemy.type === "grunt" ? 185 : 104, enemy.type === "shieldbearer" ? 22 : 0);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  if (enemy.rushTimer > 0) {
+    ctx.save();
+    ctx.rotate(enemy.signatureAngle);
+    ctx.globalAlpha = 0.65;
+    ctx.strokeStyle = enemy.type === "grunt" ? "#ff7268" : "#80b6ff";
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(-10, 22);
+    ctx.lineTo(62, 22);
+    ctx.stroke();
+    ctx.restore();
+  }
   if (enemy.skillTimer > 0) {
-    const duration = enemy.skillKind === "summon" ? 0.9 : enemy.skillKind === "heal" || enemy.skillKind === "explode" ? 0.65 : enemy.skillKind === "teleport" ? 0.55 : 0.22;
+    const duration = enemy.skillKind === "summon" ? 0.9 : enemy.skillKind === "heal" || enemy.skillKind === "explode" ? 0.65 : enemy.skillKind === "teleport" || enemy.skillKind === "rush" ? 0.55 : enemy.skillKind === "charged" ? 0.38 : enemy.skillKind === "slam" ? 0.55 : 0.38;
     const progress = 1 - enemy.skillTimer / duration;
     const skillColor = enemy.skillKind === "heal" ? "#78f0a0"
       : enemy.skillKind === "explode" ? "#ff7c3d"
       : enemy.skillKind === "summon" ? "#7be5ff"
-        : enemy.skillKind === "teleport" ? "#d49aff" : "#ffad67";
+        : enemy.skillKind === "slam" ? "#c5a6ff"
+        : enemy.skillKind === "teleport" ? "#d49aff"
+          : enemy.skillKind === "rush" ? "#80b6ff" : enemy.skillKind === "lunge" ? "#ff7268" : "#ffad67";
     ctx.save();
     ctx.globalAlpha = Math.max(0, 1 - progress) * 0.85;
     ctx.strokeStyle = skillColor;
@@ -1809,7 +2154,7 @@ function drawEnemy(enemy) {
       const ringProgress = (progress + i / ringCount) % 1;
       ctx.globalAlpha = Math.max(0, 1 - ringProgress) * 0.8;
       ctx.beginPath();
-      const maxRadius = enemy.skillKind === "summon" ? 88 : enemy.skillKind === "explode" ? 105 : 46;
+      const maxRadius = enemy.skillKind === "summon" ? 88 : enemy.skillKind === "explode" ? 105 : enemy.skillKind === "slam" ? 132 : 46;
       ctx.arc(0, 0, 14 + ringProgress * maxRadius, 0, Math.PI * 2);
       ctx.stroke();
     }
@@ -1833,6 +2178,33 @@ function drawEnemy(enemy) {
     ctx.beginPath();
     ctx.arc(0, 0, pulseRadius, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
+  }
+  if (enemy.isBoss && enemy.bossSkillTimer > 0) {
+    const profile = getWardenDifficultyProfile();
+    const duration = enemy.bossSkillKind === "nova" ? profile.novaWarning : profile.barrageCharge;
+    const progress = 1 - enemy.bossSkillTimer / duration;
+    ctx.save();
+    ctx.globalAlpha = 0.4 + Math.sin(state.time * 26) * 0.2;
+    ctx.strokeStyle = enemy.bossSkillKind === "nova" ? "#ffb266" : "#ff5368";
+    ctx.lineWidth = 3;
+    if (enemy.bossSkillKind === "nova") {
+      ctx.beginPath();
+      ctx.arc(0, 0, 48 + progress * 82, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      const targetX = enemy.bossSkillTargetX - enemy.x;
+      const targetY = enemy.bossSkillTargetY - enemy.y;
+      ctx.setLineDash([12, 8]);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(targetX, targetY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(targetX, targetY, 30 + progress * 50, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
   }
   if (enemy.attackTell) { ctx.save(); ctx.globalAlpha = 0.28 + Math.sin(state.time * 24) * 0.12; ctx.strokeStyle = "#ff5d58"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, enemy.isBoss ? 58 : 38, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
@@ -1991,10 +2363,10 @@ function drawBullet(bullet) {
     return;
   }
 
-  ctx.fillStyle = bullet.team === "player" ? "#8de7ff" : "#ff8f82";
+  ctx.fillStyle = bullet.team === "player" ? "#8de7ff" : bullet.charged ? "#ffe38c" : bullet.bossNova ? "#ff956d" : "#ff8f82";
   ctx.save();
-  ctx.strokeStyle = bullet.team === "player" ? "rgba(141,231,255,.55)" : "rgba(255,143,130,.5)";
-  ctx.lineWidth = bullet.radius;
+  ctx.strokeStyle = bullet.team === "player" ? "rgba(141,231,255,.55)" : bullet.charged ? "rgba(255,227,140,.8)" : bullet.bossNova ? "rgba(255,149,109,.8)" : "rgba(255,143,130,.5)";
+  ctx.lineWidth = bullet.charged ? bullet.radius * 1.8 : bullet.radius;
   ctx.beginPath(); ctx.moveTo(bullet.x - bullet.vx * 0.025, bullet.y - bullet.vy * 0.025); ctx.lineTo(bullet.x, bullet.y); ctx.stroke();
   ctx.beginPath();
   ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
@@ -2267,8 +2639,44 @@ function drawArenaBackground() {
 }
 
 function drawArenaEffects() {
-  if (!state.arenaModifier) return;
-  if (state.arenaModifier.id === "crossfire" && state.laneWarning > 0) {
+  for (const zone of state.bombZones) {
+    ctx.save();
+    const warning = zone.warning > 0;
+    const pulse = 0.45 + Math.sin(state.time * 24) * 0.2;
+    ctx.globalAlpha = warning ? pulse : 0.7;
+    ctx.fillStyle = warning ? "#ff553522" : "#ff553566";
+    ctx.strokeStyle = zone.fromBoss ? "#ff5368" : warning ? "#ffb14f" : "#ff5a43";
+    ctx.lineWidth = warning ? 3 : 4;
+    ctx.beginPath();
+    ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    if (warning) {
+      const progress = 1 - zone.warning / (zone.warningDuration || 1.6);
+      ctx.strokeStyle = "#fff0c2";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(zone.x, zone.y, zone.radius * 0.72, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#fff0c2";
+      ctx.font = "700 12px Orbitron, Segoe UI, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(zone.fromBoss ? "WARDEN LOCK" : "IMPACT", zone.x, zone.y + 4);
+    }
+    ctx.restore();
+  }
+  if (state.arenaModifier?.id === "surge" && (state.surgeWarning > 0 || state.surgeActive > 0)) {
+    const warning = state.surgeWarning > 0;
+    ctx.save();
+    ctx.globalAlpha = warning
+      ? 0.25 + Math.sin(state.time * 22) * 0.2
+      : 0.22 + Math.sin(state.time * 12) * 0.08;
+    ctx.strokeStyle = warning ? "#ffd166" : "#ff5368";
+    ctx.lineWidth = 7;
+    ctx.strokeRect(6, 6, WIDTH - 12, HEIGHT - 12);
+    ctx.restore();
+  }
+  if (state.arenaModifier?.id === "crossfire" && state.laneWarning > 0) {
     ctx.save();
     ctx.globalAlpha = 0.35 + Math.sin(state.time * 28) * 0.18;
     ctx.strokeStyle = "#ff5368";
@@ -2383,8 +2791,20 @@ function loop(timestamp) {
   drawWorld();
   if (state.screen === "playing") state.shakeTimer = Math.max(0, state.shakeTimer - dt);
   if (settings.shake && state.shakeTimer > 0 && state.screen === "playing" && document.body.classList.contains("playing")) {
-    canvas.style.transform = `translate(${rand(-4, 4)}px, ${rand(-3, 3)}px)`;
-  } else canvas.style.transform = "";
+    const decay = Math.pow(clamp(state.shakeTimer / Math.max(0.01, state.shakeDuration), 0, 1), 2);
+    const amplitude = state.shakeStrength * decay;
+    const jitterX = state.shakeBiasX * 0.55 + rand(-0.45, 0.45);
+    const jitterY = state.shakeBiasY * 0.55 + rand(-0.45, 0.45);
+    canvas.style.transform = `translate(${jitterX * amplitude}px, ${jitterY * amplitude}px)`;
+  } else {
+    canvas.style.transform = "";
+    if (state.shakeTimer === 0) {
+      state.shakeStrength = 0;
+      state.shakeDuration = 0;
+      state.shakeBiasX = 0;
+      state.shakeBiasY = 0;
+    }
+  }
   requestAnimationFrame(loop);
 }
 
@@ -2509,7 +2929,18 @@ document.getElementById("controlSchemeSelect").addEventListener("change", event 
   if (state.mode === "tutorial" && state.screen === "playing") renderTutorialLesson();
 });
 document.getElementById("soundToggle").addEventListener("change", event => { settings.sound = event.target.checked; storageSet("sgtSound", settings.sound); });
-document.getElementById("shakeToggle").addEventListener("change", event => { settings.shake = event.target.checked; storageSet("sgtShake", settings.shake); if (!settings.shake) canvas.style.transform = ""; });
+document.getElementById("shakeToggle").addEventListener("change", event => {
+  settings.shake = event.target.checked;
+  storageSet("sgtShake", settings.shake);
+  if (!settings.shake) {
+    state.shakeTimer = 0;
+    state.shakeDuration = 0;
+    state.shakeStrength = 0;
+    state.shakeBiasX = 0;
+    state.shakeBiasY = 0;
+    canvas.style.transform = "";
+  }
+});
 settings.sound = storageGet("sgtSound", "true") !== "false";
 settings.shake = storageGet("sgtShake", "true") !== "false";
 document.getElementById("soundToggle").checked = settings.sound;
