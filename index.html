@@ -11,31 +11,15 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <div id="game-layout">
   <main id="game-shell" aria-label="Stickman Gun Space game">
-    <canvas id="game" width="1280" height="720" aria-label="Gameplay arena"></canvas>
+    <canvas id="game" width="1336" height="848" aria-label="Gameplay arena"></canvas>
 
     <div id="hud" class="in-game-only">
       <div id="topbar">
         <span id="floorLabel">Floor 1</span>
         <span id="missionLabel">Mission: clear the floor</span>
-        <span id="timerLabel">00:00.00</span>
         <button id="pauseButton" type="button" aria-pressed="false">Pause</button>
-      </div>
-      <div id="controls">
-        <h2>COMBAT CONTROLS</h2>
-        <div><kbd>A / D</kbd><span>Move</span></div>
-        <div><kbd>W / S</kbd><span>Float up / down</span></div>
-        <div><kbd id="aimKeyHint">Mouse</kbd><span id="aimHint">Aim with the cursor</span></div>
-        <div id="mouseFireControl"><kbd>Left click</kbd><span>Hold to use loaded ammo; switches to Pistol when empty</span></div>
-        <div id="classicFireControl" class="hidden"><kbd>J</kbd><span>Hold to use loaded ammo; switches to Pistol when empty</span></div>
-        <div><kbd>WEAPON</kbd><span id="weaponLabel">Pistol</span></div>
-        <div><kbd id="rocketKeyHint">Right click</kbd><span>Fire a rocket (1 per pickup)</span></div>
-        <div><kbd id="dashKeyHint">K</kbd><span>Dash</span></div>
-        <div><kbd id="pauseKeyHint">P / ESC</kbd><span>Pause</span></div>
-        <div><kbd>R</kbd><span>Restart run</span></div>
-        <div class="control-tip"><span class="control-dot"></span><span>Weapon pickups respawn randomly; Rifle +15, SMG +30, Heavy +3</span></div>
-        <div class="control-tip"><span class="control-dot"></span><span>Rocket pickups add 1 explosive rocket</span></div>
-        <div class="control-tip"><span class="control-dot heal-dot"></span><span>Collect medkits to restore HP</span></div>
       </div>
       <div id="statusText">Choose a mode and deploy.</div>
       <section id="tutorialPanel" class="tutorial-panel hidden" aria-live="polite" aria-labelledby="tutorialTitle">
@@ -89,7 +73,7 @@
           <div class="hero-floor floor-a"></div><div class="hero-floor floor-b"></div><div class="hero-floor floor-c"></div>
         </div>
       </div>
-      <div class="menu-bottomline"><span>W / S TO FLOAT</span><span>A / D TO MOVE</span><span id="menuWeaponHint">PICKUPS AUTO-EQUIP // LEFT CLICK FIRE</span><span id="menuFireHint">SPACE DASH // RIGHT CLICK ROCKET</span><span class="bottom-warning">⚠ EXPECT HEAVY RESISTANCE</span></div>
+      <div class="menu-bottomline"><span>W / S TO FLOAT</span><span>A / D TO MOVE</span><span id="menuWeaponHint">1 / 2 / 3 EQUIP // LEFT CLICK FIRE</span><span id="menuFireHint">SPACE DASH // RIGHT CLICK ROCKET</span><span class="bottom-warning">⚠ EXPECT HEAVY RESISTANCE</span></div>
     </section>
 
     <section id="loadoutPanel" class="dialog-panel loadout-panel hidden" aria-labelledby="loadoutTitle">
@@ -103,13 +87,15 @@
       </div>
       <label class="setting-row hidden" id="towerDifficultyRow"><span><strong>TOWER THREAT LEVEL</strong><small>Choose enemy speed, strength, and numbers</small></span><select id="towerDifficultySelect"><option value="easy">EASY</option><option value="normal">NORMAL</option><option value="hard">HARD</option></select></label>
       <div id="settingsRows" class="hidden"><label class="setting-row"><span><strong>SOUND</strong><small>Combat and menu sound effects</small></span><input id="soundToggle" type="checkbox" checked></label><label class="setting-row"><span><strong>SCREEN SHAKE</strong><small>Impact camera feedback</small></span><input id="shakeToggle" type="checkbox" checked></label></div>
+      <div id="operatorCustomize" class="operator-customize hidden"><label>OPERATOR CALLSIGN<input id="operatorName" maxlength="14" value="OPERATOR 01"></label><label>VISUAL MARK<select id="operatorAccessory"><option value="none">NONE</option><option value="visor">VISOR</option><option value="crown">CROWN</option><option value="bandana">BANDANA</option></select></label></div>
+      <section class="mission-leaderboard"><div class="mission-leaderboard-heading">LOCAL LEADERBOARD <span id="missionLeaderboardTitle">TOWER NORMAL THREAT</span></div><div id="missionLeaderboardList" class="leaderboard-entries"></div></section>
       <div class="dialog-footer"><span id="loadoutSummary">TOWER BREACH / WEAPONS IN FIELD</span><button id="confirmDeploy" class="action-button action-primary" type="button">INITIATE DEPLOYMENT →</button></div>
     </section>
 
     <section id="helpPanel" class="dialog-panel narrow-panel hidden" aria-labelledby="helpTitle">
       <div class="dialog-top"><span class="eyebrow">FIELD MANUAL</span><button class="close-button" data-close="helpPanel" aria-label="Close help">×</button></div>
       <h2 id="helpTitle">HOW TO SURVIVE</h2>
-      <div class="help-list"><p><kbd>A / D</kbd> Move horizontally</p><p><kbd>W / S</kbd> Float up / down</p><p id="helpMouseAim"><kbd>Mouse</kbd> Aim with the cursor</p><p id="helpClassicAim" class="hidden"><kbd>A / D / W / S</kbd> Aim in the direction you move</p><p id="helpMouseControls"><kbd>Mouse scheme</kbd> Left click fires your equipped weapon; right click fires a rocket; Space dashes. Weapon pickups automatically equip.</p><p id="helpClassicControls" class="hidden"><kbd>Keyboard scheme</kbd> Hold J to fire your equipped weapon; K dashes; L fires a rocket. Pickups automatically equip.</p><p id="helpTouchControls" class="hidden"><kbd>Touch screen</kbd> Left stick moves, right stick aims and automatically fires your equipped weapon. DASH sits beside aim; ROCKET launches a rocket.</p><p><kbd>Pickups</kbd> Rifle: 15 shots. SMG: 30 fast, low-damage shots. Heavy Cannon: 3 slow, high-damage shots. Weapon pickups automatically equip.</p><p><kbd id="helpDashHint">Space</kbd> Dash and briefly avoid damage; time it against incoming shots for a perfect dodge</p><p><kbd>Walls</kbd> Press away from a wall to kick off and reposition</p><p><kbd id="helpPauseHint">P / ESC</kbd> Pause the action</p><p><kbd>R</kbd> Restart the run</p></div>
+      <div class="help-list"><p><kbd>A / D</kbd> Move horizontally</p><p><kbd>W / S</kbd> Float up / down</p><p id="helpMouseAim"><kbd>Mouse</kbd> Aim with the cursor</p><p id="helpClassicAim" class="hidden"><kbd>A / D / W / S</kbd> Aim in the direction you move</p><p id="helpMouseControls"><kbd>Mouse scheme</kbd> Left click fires your equipped weapon; right click fires a rocket; Space dashes. Pickups automatically equip; 1 / 2 / 3 can select weapons with ammo.</p><p id="helpClassicControls" class="hidden"><kbd>Keyboard scheme</kbd> Hold J to fire your equipped weapon; K dashes; L fires a rocket. Pickups automatically equip.</p><p id="helpTouchControls" class="hidden"><kbd>Touch screen</kbd> Left stick moves, right stick aims and automatically fires your equipped weapon. DASH sits beside aim; ROCKET launches a rocket.</p><p><kbd>Pickups</kbd> Rifle: 15 shots. SMG: 30 fast, low-damage shots. Heavy Cannon: 3 slow, high-damage shots. Weapon pickups automatically equip.</p><p><kbd id="helpDashHint">Space</kbd> Dash and briefly avoid damage; time it against incoming shots for a perfect dodge</p><p><kbd>Walls</kbd> Press away from a wall to kick off and reposition</p><p><kbd id="helpPauseHint">P / ESC</kbd> Pause the action</p><p><kbd>R</kbd> Restart the run</p></div>
       <p class="tip-box">Rockets damage every enemy caught in the blast, and enemies can shoot from anywhere in the arena. Keep moving, collect medkits when your health is low, and save rockets for groups or bosses.</p>
       <button id="startTutorialButton" class="action-button action-secondary full-width" type="button">START TRAINING TUTORIAL</button>
       <button class="action-button action-primary full-width" data-close="helpPanel" type="button">GOT IT</button>
@@ -120,7 +106,7 @@
     </section>
 
     <section id="resultPanel" class="overlay-panel hidden" aria-labelledby="resultTitle">
-      <div class="overlay-card"><p id="resultEyebrow" class="eyebrow">MISSION REPORT</p><h2 id="resultTitle">RUN ENDED</h2><p id="resultMessage">The tower won this round.</p><p id="resultMode" class="result-record">TOWER RUN</p><div class="result-stats"><div><strong id="resultScore">0</strong><span>SCORE</span></div><div><strong id="resultFloor">1</strong><span>HIGHEST FLOOR</span></div><div><strong id="resultTime">00:00.00</strong><span>TIME</span></div><div><strong id="resultBestScore">000000</strong><span>MODE BEST</span></div><div><strong id="resultEnemies">0</strong><span>HOSTILES DOWN</span></div><div><strong id="resultRockets">0</strong><span>ROCKETS USED</span></div></div><p id="resultRecord" class="result-record"></p><button id="retryButton" class="action-button action-primary full-width" type="button">RETRY RUN</button><button id="resultMenuButton" class="action-button action-secondary full-width" type="button">MAIN MENU</button></div>
+      <div class="result-layout"><div class="overlay-card"><p id="resultEyebrow" class="eyebrow">MISSION REPORT</p><h2 id="resultTitle">RUN ENDED</h2><p id="resultMessage">The tower won this round.</p><p id="resultMode" class="result-record">TOWER RUN</p><div class="result-stats"><div><strong id="resultScore">0</strong><span>SCORE</span></div><div><strong id="resultFloor">1</strong><span>HIGHEST FLOOR</span></div><div><strong id="resultTime">00:00.00</strong><span>TIME</span></div><div><strong id="resultBestScore">000000</strong><span>MODE BEST</span></div><div><strong id="resultEnemies">0</strong><span>HOSTILES DOWN</span></div><div><strong id="resultRockets">0</strong><span>ROCKETS USED</span></div></div><p id="resultRecord" class="result-record"></p><button id="retryButton" class="action-button action-primary full-width" type="button">RETRY RUN</button><button id="resultMenuButton" class="action-button action-secondary full-width" type="button">MAIN MENU</button></div><aside class="result-leaderboard"><p class="eyebrow">LOCAL FLIGHT RECORD</p><h3 id="resultLeaderboardTitle">TOWER NORMAL THREAT</h3><p class="leaderboard-help">Top operators for this mission.</p><div id="resultLeaderboardList" class="leaderboard-entries"></div></aside></div>
     </section>
 
     <section id="tutorialFinishConfirm" class="overlay-panel hidden" aria-labelledby="tutorialFinishTitle">
@@ -147,9 +133,19 @@
       <p id="dailyChallengeText" class="tip-box"></p>
       <div id="achievementList" class="help-list"></div>
       <div id="masteryList" class="help-list"></div>
+      <div class="mission-leaderboard"><div class="mission-leaderboard-heading">LOCAL RECORDS <span id="recordsLeaderboardTitle">TOWER NORMAL THREAT</span></div><div id="leaderboardList" class="leaderboard-entries"></div></div>
     </section>
 
   </main>
+  <aside id="controls" aria-label="Game controls">
+    <h2>CONTROLS</h2>
+    <div><kbd id="moveKeyHint">A / D + W / S</kbd><span>Move</span></div>
+    <div><kbd id="fireKeyHint">Left click</kbd><span>Fire</span></div>
+    <div><kbd id="dashKeyHint">Space</kbd><span>Dash</span></div>
+    <div><kbd id="rocketKeyHint">Right click</kbd><span>Rocket</span></div>
+    <div><kbd id="pauseKeyHint">ESC</kbd><span>Pause</span></div>
+  </aside>
+  </div>
   <script src="game.js"></script>
 </body>
 </html>

@@ -95,6 +95,8 @@ canvas {
   letter-spacing: 0.06em;
 }
 
+@media(max-width:800px){.operator-customize{grid-template-columns:1fr}}
+
 #floorLabel {
   justify-self: start;
   padding: 9px 12px;
@@ -175,6 +177,10 @@ canvas {
   font-size: 9px;
   letter-spacing: 0.025em;
 }
+
+.operator-customize{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.operator-customize label{display:grid;gap:7px;color:#a99da2;font-size:9px;font-weight:800;letter-spacing:.1em}
+.operator-customize input,.operator-customize select{width:100%;padding:10px;border:1px solid #ff665a44;border-radius:3px;background:#120d12;color:#fff;font:12px "Segoe UI",sans-serif}
 
 #controls h2 {
   grid-column: 1 / -1;
@@ -438,15 +444,19 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 .floor-clear-panel.floor-ending .overlay-card{animation:floorEndCardIn .55s cubic-bezier(.16,.8,.25,1) both}
 .floor-clear-panel.floor-starting .overlay-card{animation:floorStartCardIn .65s cubic-bezier(.16,.8,.25,1) both}
 .result-victory{background:radial-gradient(ellipse at 50% 38%,#f2a72330,transparent 52%),#05060bd9}
-.result-victory::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,#ffe27a 0 2px,transparent 3px),radial-gradient(circle,#ff7468 0 2px,transparent 3px),radial-gradient(circle,#fff4d6 0 1.5px,transparent 3px);background-size:97px 113px,137px 149px,71px 89px;background-position:12px 0,60px 45px,20px 70px;animation:celebrationFall 3.5s ease-out both}
+.result-victory::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.6;background-image:radial-gradient(circle,#ffe27a 0 2px,transparent 3px),radial-gradient(circle,#ff7468 0 2px,transparent 3px),radial-gradient(circle,#fff4d6 0 1.5px,transparent 3px);background-size:97px 113px,137px 149px,71px 89px;background-position:12px 0,60px 45px,20px 70px;animation:celebrationReveal .8s ease-out both,victoryParticleDrift 8s linear .8s infinite}
+.result-victory::after{content:"";position:absolute;inset:-12%;pointer-events:none;opacity:.42;background-image:radial-gradient(circle,#ffcc6a 0 1.5px,transparent 3px),radial-gradient(circle,#ff887a 0 1px,transparent 2.5px);background-size:181px 197px,233px 251px;background-position:0 0,37px 61px;animation:victorySparkDrift 11s linear infinite}
 .result-victory .overlay-card{position:relative;animation:victoryCardIn .8s cubic-bezier(.16,.8,.25,1) both;border-color:#ffd66f99;box-shadow:0 0 65px #ffc83c38,0 20px 80px #000b}
 .result-victory #resultMessage{color:#ffe69a;text-shadow:0 0 18px #ffcd5a66;animation:victoryMessageIn .7s .35s both}
 .result-victory .result-stats{opacity:0;animation:scoreReveal .7s 1.6s ease-out forwards}
-@keyframes celebrationFall{0%{opacity:0;transform:translateY(-12%)}15%{opacity:1}100%{opacity:.5;transform:translateY(12%)}}
+@keyframes celebrationReveal{from{opacity:0}to{opacity:.6}}
+@keyframes victoryParticleDrift{0%{transform:translateY(-5%);background-position:12px 0,60px 45px,20px 70px}100%{transform:translateY(5%);background-position:12px 420px,60px -340px,20px 560px}}
+@keyframes victorySparkDrift{0%{transform:translate3d(-1%,-2%,0);background-position:0 0,37px 61px}100%{transform:translate3d(1%,8%,0);background-position:0 430px,250px -230px}}
 @keyframes victoryCardIn{from{opacity:0;transform:translateY(24px) scale(.92);filter:blur(7px)}to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
 @keyframes victoryMessageIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
 @keyframes scoreReveal{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.result-victory::before,.result-victory .overlay-card,.result-victory #resultMessage,.result-victory .result-stats{animation-duration:.01ms;animation-delay:0s}}
+@media(prefers-reduced-motion:reduce){.result-victory::before,.result-victory::after{animation:none}}
 @keyframes floorShadeIn{from{opacity:0}to{opacity:1}}
 @keyframes floorEndCardIn{from{opacity:0;transform:translateY(28px) scale(.9);filter:blur(8px)}to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
 @keyframes floorStartCardIn{0%{opacity:0;transform:translateY(-30px) scale(1.08);filter:blur(8px)}65%{opacity:1;transform:translateY(5px) scale(.99);filter:blur(0)}100%{transform:translateY(0) scale(1)}}
@@ -455,6 +465,38 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 #recordsPanel{max-height:90%;overflow:auto}
 #recordsPanel .help-list{gap:7px;margin:13px 0}
 #recordsPanel .help-list p{line-height:1.5}
+
+/* Responsive UI motion and input feedback. */
+.dialog-panel:not(.hidden){animation:uiPanelIn .28s cubic-bezier(.2,.75,.25,1) both}
+.overlay-panel:not(.hidden):not(.floor-clear-panel):not(.result-victory){animation:uiOverlayIn .22s ease-out both}
+.overlay-panel:not(.hidden):not(.floor-clear-panel):not(.result-victory) .overlay-card{animation:uiCardIn .32s cubic-bezier(.2,.75,.25,1) both}
+.action-button,.choice-card,.close-button,.tutorial-actions button,.touch-dash-button,.touch-rocket-button,.setting-row,.menu-utility button,.text-button{transition:transform .16s ease,border-color .18s ease,background-color .18s ease,box-shadow .18s ease,filter .18s ease,color .18s ease}
+.choice-card{overflow:hidden}
+.choice-card::after{position:absolute;inset:0;content:"";pointer-events:none;background:linear-gradient(105deg,transparent 34%,#ffffff10 50%,transparent 66%);transform:translateX(-120%);transition:transform .4s ease}
+.setting-row:focus-within{padding-right:10px;padding-left:10px;background:#ff62500c;box-shadow:inset 3px 0 #ff786b}
+.tutorial-panel.lesson-change{animation:tutorialLessonIn .24s cubic-bezier(.2,.75,.25,1) both}
+.tutorial-actions button:not(:disabled):active,.touch-dash-button:active,.touch-rocket-button:active{transform:scale(.95)}
+@media(hover:hover){
+  .choice-card:hover{transform:translateY(-3px);border-color:#ff8b7f88;box-shadow:0 10px 28px #0006,0 0 20px #ff594b18}
+  .choice-card:hover::after{transform:translateX(120%)}
+  .action-button:hover,.close-button:hover{box-shadow:0 7px 22px #ff594b22}
+  .setting-row:hover{background:#ffffff08}
+  .menu-utility button:hover,.text-button:hover{transform:translateY(-1px)}
+}
+@media(max-width:800px){
+  .dialog-panel:not(.hidden){animation-duration:.22s}
+  .overlay-panel:not(.hidden):not(.floor-clear-panel):not(.result-victory){animation-duration:.18s}
+  .overlay-panel:not(.hidden):not(.floor-clear-panel):not(.result-victory) .overlay-card{animation-duration:.24s}
+  .choice-card:hover{transform:none}
+}
+@keyframes uiPanelIn{from{opacity:0;transform:translateY(12px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes uiOverlayIn{from{opacity:0}to{opacity:1}}
+@keyframes uiCardIn{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes tutorialLessonIn{from{opacity:.65;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){
+  .dialog-panel:not(.hidden),.overlay-panel:not(.hidden):not(.floor-clear-panel):not(.result-victory),.overlay-panel:not(.hidden):not(.floor-clear-panel):not(.result-victory) .overlay-card,.tutorial-panel.lesson-change{animation:none}
+  .action-button,.choice-card,.close-button,.tutorial-actions button,.touch-dash-button,.touch-rocket-button,.setting-row,.menu-utility button,.text-button,.choice-card::after{transition:none}
+}
 #recordsPanel .help-list strong{color:var(--hot)}
 #recordsPanel .tip-box{margin-top:20px}
 #recordsButton{display:block;margin-top:8px}
@@ -482,8 +524,154 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 .touch-rocket-button{grid-column:2;grid-row:1;background:linear-gradient(120deg,#e83531,#ff633f)}
 .touch-dash-button:active,.touch-rocket-button:active{filter:brightness(1.4)}
 .touch-dash-button:active{filter:brightness(1.4)}
-body.touch-controls-enabled #controls{display:none}
 body.touch-controls-enabled canvas{touch-action:none}
 @media(max-width:800px){.mode-grid{grid-template-columns:1fr}.loadout-panel .choice-card{min-height:96px}.tutorial-panel{top:76px;right:10px;width:min(340px,calc(100% - 20px));padding:11px}.tutorial-panel h2{font-size:12px}.tutorial-panel>p:not(.eyebrow){font-size:11px}.tutorial-actions button{font-size:7px}.tutorial-actions .action-button{margin-left:0}}
 @media(max-width:480px){.tutorial-panel{top:73px;right:7px;width:calc(100% - 14px);padding:9px 10px}.tutorial-panel>p:not(.eyebrow){margin:5px 0 8px;font-size:10px}.touch-stick{bottom:12px;width:88px;height:88px}.touch-stick>span{width:34px;height:34px;margin:-17px}.touch-move-stick{left:10px}.touch-aim-cluster{right:10px;bottom:12px;grid-template-columns:45px 88px;grid-template-rows:34px 88px;gap:4px}.touch-dash-button,.touch-rocket-button{min-width:45px;min-height:34px;font-size:7px}.tutorial-actions{gap:5px}.tutorial-actions button{min-height:30px;padding:5px 7px}}
 @media(max-width:800px){#game-shell{min-height:0}}
+
+#game-layout{display:grid;grid-template-rows:minmax(0,1fr) auto;gap:10px;width:min(98vw,1440px);height:min(96vh,900px);min-height:480px}
+#game-shell{width:100%;height:auto;min-height:0}
+#controls{position:static;transform:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;width:100%;padding:10px 14px;border:1px solid #ff655a66;border-radius:6px;background:linear-gradient(145deg,#170d12f2,#090a10f2);font-size:10px;z-index:auto}
+#controls h2{grid-column:1/-1;font-size:10px}
+#controls>div{justify-content:center;gap:9px}
+body:not(.playing) #controls{visibility:hidden}
+@media(max-width:800px){#game-layout{width:100vw;height:100dvh;min-height:0;gap:0}#game-shell{width:100%;height:auto;min-height:0;border-radius:0}#controls{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;padding:8px 4px;border-width:1px 0 0;border-radius:0;font-size:8px}#controls>div{flex-direction:column;gap:4px}#controls kbd{font-size:8px;padding:3px 4px}#controls h2{font-size:8px}}
+@media(max-width:420px){#controls{font-size:7px}#controls>div{font-size:7px}#controls kbd{font-size:7px;white-space:normal}}
+
+/* Keep mission text plain; show run time and blackout countdown by the score HUD. */
+#topbar{grid-template-columns:minmax(110px,auto) minmax(0,1fr) auto}
+@media(max-width:800px){#topbar{grid-template-columns:auto minmax(0,1fr) auto;gap:7px;padding:8px;min-height:64px}#missionLabel{font-size:8px}}
+@media(max-width:480px){#topbar{grid-template-columns:auto minmax(0,1fr) auto;gap:4px;padding:6px}#missionLabel{font-size:7px;letter-spacing:0}}
+
+#resultPanel{overflow-y:auto;padding:24px}
+.result-layout{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(275px,.85fr);align-items:stretch;gap:16px;width:min(1000px,100%);max-height:calc(100vh - 48px)}
+.result-layout>.overlay-card{width:100%;max-height:calc(100vh - 48px);overflow-y:auto}
+.result-leaderboard{display:flex;flex-direction:column;min-width:0;padding:24px 20px;border:1px solid #ff756777;background:linear-gradient(150deg,#1a1118f5,#080a10f7);box-shadow:0 0 38px #ff39201c;text-align:left}
+.result-leaderboard .eyebrow{margin:0 0 10px;font-size:8px}
+.result-leaderboard h3{margin:0;color:#fff1ed;font:800 19px Orbitron,"Segoe UI",sans-serif;letter-spacing:.02em}
+.leaderboard-help{margin:8px 0 16px;color:#a99ca2;font:12px/1.5 "Segoe UI",sans-serif}
+.leaderboard-entries{display:grid;align-content:start;gap:8px;overflow-y:auto}
+.leaderboard-entries p{display:block;margin:0;padding:9px 8px;border-bottom:1px solid #ffffff18;color:#e5d9dc;font:600 10px/1.5 Orbitron,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+.leaderboard-entries p:first-child{color:#ffe28c;background:#ffc85710}
+.leaderboard-section-title{margin:18px 0 -10px;color:#ff9a8d;font:800 9px Orbitron,"Segoe UI",sans-serif;letter-spacing:.12em}
+.leaderboard-list{max-height:220px;overflow:auto}
+.mission-leaderboard{margin:14px 0 4px;padding:12px 14px;border:1px solid #ff655a55;background:linear-gradient(135deg,#ff463d0c,#090a10dd);}
+.mission-leaderboard-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:7px;color:#ff9a8d;font:800 9px Orbitron,"Segoe UI",sans-serif;letter-spacing:.1em}
+.mission-leaderboard-heading span{color:#e7dadd;text-align:right}
+.mission-leaderboard .leaderboard-entries{gap:0}
+.mission-leaderboard .leaderboard-entries p{padding:6px 4px;font-size:9px;line-height:1.4}
+@media(max-width:800px){.mission-leaderboard{margin:10px 0;padding:9px}.mission-leaderboard-heading{font-size:8px}.mission-leaderboard .leaderboard-entries p{font-size:8px}}
+@media(max-width:800px){#resultPanel{padding:14px}.result-layout{grid-template-columns:minmax(0,1fr);gap:10px;width:min(540px,100%);max-height:none}.result-layout>.overlay-card{max-height:none;padding:22px}.result-leaderboard{padding:16px}.leaderboard-entries{max-height:180px}}
+
+@media(min-width:801px){.result-layout{grid-template-columns:minmax(0,1.2fr) minmax(370px,.95fr);gap:20px;width:min(1160px,100%);max-height:calc(100vh - 40px)}.result-layout>.overlay-card{max-height:calc(100vh - 40px)}}
+.result-leaderboard{min-height:430px;padding:30px 26px;border-width:2px}
+.result-leaderboard .eyebrow{font-size:10px;letter-spacing:.18em}
+.result-leaderboard h3{font-size:24px}
+.leaderboard-help{font-size:14px;margin:11px 0 20px}
+.leaderboard-entries{gap:10px}
+.leaderboard-entries p{padding:13px 10px;font-size:12px;line-height:1.7}
+.leaderboard-entries p:first-child{font-size:13px}
+@media(max-width:800px){.result-leaderboard{min-height:300px;padding:22px}.result-leaderboard h3{font-size:21px}.leaderboard-entries p{font-size:11px}}
+
+.loadout-panel{text-align:center}
+.loadout-panel .dialog-top{position:relative;justify-content:center}
+.loadout-panel .dialog-top .close-button{position:absolute;right:0}
+.loadout-panel h2,.loadout-panel .dialog-subtitle,.loadout-panel .choice-label{text-align:center}
+.loadout-panel .choice-card{align-items:center;text-align:center}
+.loadout-panel .choice-card small{width:100%;text-align:center}
+.loadout-panel .setting-row{justify-content:center;flex-direction:column;text-align:center}
+.loadout-panel .setting-row span:first-child{justify-items:center;text-align:center}
+.loadout-panel .setting-row select{margin:0 auto}
+.loadout-panel .operator-customize label{justify-items:center;text-align:center}
+.loadout-panel .operator-customize input,.loadout-panel .operator-customize select{text-align:center;text-align-last:center}
+.loadout-panel .mission-leaderboard-heading{justify-content:center;flex-direction:column;text-align:center}
+.loadout-panel .mission-leaderboard-heading span{text-align:center}
+.loadout-panel .mission-leaderboard .leaderboard-entries p{text-align:center}
+.loadout-panel .dialog-footer{justify-content:center;flex-direction:column;text-align:center}
+.loadout-panel .dialog-footer>span{text-align:center}
+.result-leaderboard{align-items:center;text-align:center}
+.result-leaderboard .eyebrow,.result-leaderboard h3,.result-leaderboard .leaderboard-help{text-align:center}
+.result-leaderboard .leaderboard-entries{width:100%}
+.result-leaderboard .leaderboard-entries p{text-align:left}
+
+/* Extra diegetic framing for the combat display and mission panels. */
+#game-shell{border-color:#ff796d88;box-shadow:0 0 0 1px #210d13,0 0 42px #ff392022,inset 0 0 42px #ff50300b}
+#game-shell::before{position:absolute;inset:0;z-index:1;pointer-events:none;content:"";opacity:.12;background:repeating-linear-gradient(0deg,transparent 0 3px,#ffb1a10c 4px,#ffb1a10c 5px);mix-blend-mode:screen}
+#topbar{border-color:#ff796d77;background:linear-gradient(105deg,#211116ee,#100d13f5 52%,#171015ed);box-shadow:0 9px 30px #0009,inset 0 1px #ffd9d51a,0 0 24px #ff4a3710}
+#floorLabel{position:relative;overflow:hidden;border-color:#ff796d77;background:linear-gradient(120deg,#ff49341f,#39171966);box-shadow:inset 0 0 16px #ff473a12,0 0 14px #ff49351a}
+#floorLabel::before{content:"";display:inline-block;width:6px;height:6px;margin:0 8px 1px 0;border-radius:50%;background:#ff8b68;box-shadow:0 0 9px #ff694d;animation:sectorPulse 2.2s ease-in-out infinite}
+#missionLabel{color:#f5d9d4;text-shadow:0 0 12px #ff776533;letter-spacing:.1em}
+#timerLabel{padding:7px 10px;border:1px solid #ff806733;background:#ff483610;text-shadow:0 0 12px #ff927e55}
+#pauseButton{border-radius:3px;text-transform:uppercase;letter-spacing:.12em;transition:filter .15s,box-shadow .15s,transform .15s}
+#pauseButton:hover{filter:brightness(1.2);box-shadow:inset 0 1px #ffffff22,0 0 20px #ff594426;transform:translateY(-1px)}
+#statusText{border-radius:3px;border-color:#ff796d66;background:linear-gradient(105deg,#1b1115f2,#090a10f2);box-shadow:0 8px 26px #0009,inset 0 1px #fff1,0 0 20px #ff4b3814}
+.screen-panel{background:radial-gradient(ellipse at 74% 48%,#9a292423 0%,#40181b33 34%,transparent 68%),radial-gradient(ellipse at 50% 110%,#ff58300d,transparent 50%),linear-gradient(110deg,#08090d 0%,#101015 53%,#190d12 100%)}
+.screen-panel::after{position:absolute;inset:0;z-index:0;pointer-events:none;content:"";opacity:.14;background-image:linear-gradient(#ff9a8510 1px,transparent 1px),linear-gradient(90deg,#ff9a8510 1px,transparent 1px);background-size:48px 48px;mask-image:linear-gradient(90deg,transparent 10%,#000 90%)}
+.menu-topline{color:#e4c4c2;text-shadow:0 0 12px #ff6b5b20}
+.menu-copy h1 span{text-shadow:0 0 32px #ff352c55,4px 4px 0 #000}
+.hero-scene::after{position:absolute;inset:9% 4%;z-index:-1;border:1px solid #ff75651c;clip-path:polygon(0 0,22% 0,22% 1px,1px 1px,1px 28%,0 28%,0 0,100% 0,100% 28%,calc(100% - 1px) 28%,calc(100% - 1px) 1px,78% 1px,78% 0,100% 0,100% 100%,78% 100%,78% calc(100% - 1px),calc(100% - 1px) calc(100% - 1px),calc(100% - 1px) 72%,100% 72%,100% 100%,0 100%,0 72%,1px 72%,1px calc(100% - 1px),22% calc(100% - 1px),22% 100%);content:"";pointer-events:none}
+.warning-stamp{box-shadow:0 0 22px #ff48351c,inset 0 0 16px #ff483514}
+.action-primary{box-shadow:0 8px 24px #ff382333,0 0 22px #ff38231b,inset 0 1px #ffffff29}
+.choice-card{transition:transform .18s,border-color .18s,background .18s,box-shadow .18s}
+.choice-card:hover{transform:translateY(-2px);border-color:#ff95865c;background:linear-gradient(135deg,#ff473d17,#ffffff07);box-shadow:0 10px 24px #0005}
+.choice-card.selected{box-shadow:inset 3px 0 #ff483d,0 0 20px #ff473d1c}
+.dialog-panel,.overlay-card,.result-leaderboard{border-radius:3px;background-image:linear-gradient(135deg,#211419f7,#0b0b11fa 72%);box-shadow:0 24px 90px #000c,0 0 42px #ff39201b,inset 0 1px #ffd7d20c}
+.dialog-panel{border-color:#ff796d77}
+.mission-leaderboard,.leaderboard-entries p{backdrop-filter:blur(8px)}
+.tutorial-panel{border-color:#ff8b7b99;background:linear-gradient(130deg,#201216f5,#0b0a10f5);box-shadow:0 14px 42px #000b,0 0 24px #ff493515}
+#controls{box-shadow:0 12px 32px #0009,0 0 24px #ff483711,inset 0 1px #ffd7d20c}
+@keyframes sectorPulse{50%{opacity:.45;box-shadow:0 0 3px #ff694d}}
+@media(prefers-reduced-motion:reduce){#floorLabel::before{animation:none}}
+
+/* Keep the game panel and its controls together without squeezing either. */
+#game-layout{width:min(98vw,1336px,calc(151.2vh - 139px));height:min(96vh,900px);min-height:0;grid-template-rows:minmax(0,1fr) auto;gap:10px}
+#game-shell{width:100%;height:auto;min-width:0;min-height:0;aspect-ratio:1336/848;align-self:center;justify-self:center}
+#controls{width:100%;min-height:68px;grid-template-columns:auto repeat(5,minmax(0,1fr));align-items:center;gap:8px;padding:9px 12px}
+#controls h2{grid-column:auto;margin:0;padding:0 12px 0 0;border:0;border-right:1px solid #ff796d44;font-size:9px;white-space:nowrap}
+#controls>div{justify-content:center;min-height:30px}
+@media(min-height:938px){#game-layout{width:min(98vw,1279px)}}
+@media(max-width:800px){#game-layout{width:100vw;height:100dvh;min-height:0;gap:0;grid-template-rows:minmax(0,1fr) auto}#game-shell{width:100%;height:auto;min-height:0;aspect-ratio:auto;border-radius:0}#controls{min-height:0;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;padding:8px 4px;border-width:1px 0 0;border-radius:0;font-size:8px}#controls h2{grid-column:1/-1;margin:0;padding:0 0 5px;border:0;border-bottom:1px solid #ff796d44;font-size:8px}#controls>div{flex-direction:column;gap:4px}#controls kbd{font-size:8px;padding:3px 4px}}
+body:not(.playing) #controls{visibility:visible}
+.leaderboard-entries p:not(.leaderboard-empty){display:grid;grid-template-columns:32px minmax(0,1fr) 32px;align-items:center}
+.leaderboard-rank{grid-column:1;justify-self:start;text-align:left;color:#a99ca2}
+.leaderboard-rank.rank-gold{color:#ffd95b;text-shadow:0 0 10px #ffc92899}
+.leaderboard-rank.rank-silver{color:#dce7f2;text-shadow:0 0 9px #b9d4e966}
+.leaderboard-rank.rank-bronze{color:#d99462;text-shadow:0 0 9px #b8663d77}
+.leaderboard-details{grid-column:2;display:flex;flex-direction:column;align-items:center;text-align:center}
+.leaderboard-name{color:#fff1ed;font-weight:800;text-transform:uppercase}
+.leaderboard-name.rank-gold{color:#ffd95b;text-shadow:0 0 10px #ffc92899}
+.leaderboard-name.rank-silver{color:#dce7f2;text-shadow:0 0 9px #b9d4e966}
+.leaderboard-name.rank-bronze{color:#d99462;text-shadow:0 0 9px #b8663d77}
+.leaderboard-name.rank-gray{color:#9a9a9a;text-shadow:none}
+.leaderboard-stats{color:#c8bbc0;font:600 .88em/1.4 "Segoe UI",sans-serif}
+.leaderboard-empty{display:block!important;text-align:center}
+
+/* Give each HUD item its own column and keep the mission label from pushing controls off-screen. */
+#topbar{top:16px;right:16px;left:16px;grid-template-columns:max-content minmax(0,1fr) max-content;gap:clamp(6px,1vw,12px);min-height:66px;padding:9px 12px}
+#floorLabel{min-width:96px;padding:8px 10px;font-size:11px}
+#missionLabel{display:block;min-width:0;justify-self:stretch;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(9px,1vw,12px)}
+#pauseButton{min-width:88px;padding:9px 12px;font-size:10px}
+@media(max-width:800px){#topbar{top:8px;right:8px;left:8px;grid-template-columns:max-content minmax(0,1fr) max-content;gap:5px;min-height:48px;padding:6px}#floorLabel{min-width:0;padding:6px 7px;font-size:8px}#floorLabel::before{width:5px;height:5px;margin-right:5px}#missionLabel{font-size:8px;letter-spacing:0}#pauseButton{min-width:56px;padding:7px 6px;font-size:8px;letter-spacing:.06em}}
+@media(max-width:380px){#topbar{gap:3px;padding:5px}#missionLabel{font-size:7px}#pauseButton{min-width:50px;font-size:7px}}
+
+/* Increase leaderboard readability in both the mission menu and results. */
+.mission-leaderboard{width:100%;margin:20px auto 10px;padding:18px 20px;border-width:2px}
+.loadout-panel .mission-leaderboard-heading{gap:7px;margin-bottom:14px;font-size:13px;letter-spacing:.13em}
+.loadout-panel .mission-leaderboard .leaderboard-entries p:not(.leaderboard-empty){grid-template-columns:42px minmax(0,1fr) 42px;padding:11px 8px;font-size:13px;line-height:1.5}
+.loadout-panel .mission-leaderboard .leaderboard-name{font-size:1.05em}
+.loadout-panel .mission-leaderboard .leaderboard-stats{font-size:.92em}
+.loadout-panel .mission-leaderboard .leaderboard-empty{font-size:12px;padding:12px}
+.result-leaderboard .leaderboard-entries p:not(.leaderboard-empty){grid-template-columns:42px minmax(0,1fr) 42px;padding:14px 10px;font-size:14px}
+.result-leaderboard .leaderboard-name{font-size:1.05em}
+.result-leaderboard .leaderboard-stats{font-size:.9em}
+@media(max-width:800px){.mission-leaderboard{margin:12px auto 8px;padding:12px}.loadout-panel .mission-leaderboard-heading{font-size:10px}.loadout-panel .mission-leaderboard .leaderboard-entries p:not(.leaderboard-empty){grid-template-columns:34px minmax(0,1fr) 34px;padding:8px 4px;font-size:11px}.loadout-panel .mission-leaderboard .leaderboard-stats{font-size:.9em}.result-leaderboard .leaderboard-entries p:not(.leaderboard-empty){grid-template-columns:36px minmax(0,1fr) 36px;padding:10px 6px;font-size:12px}}
+.loadout-panel .mission-leaderboard .leaderboard-entries p:not(.leaderboard-empty){font-size:15px}
+.loadout-panel .mission-leaderboard .leaderboard-name{font-size:1.1em}
+.loadout-panel .mission-leaderboard .leaderboard-stats{font-size:1em}
+.result-leaderboard .leaderboard-entries p:not(.leaderboard-empty){font-size:16px}
+.result-leaderboard .leaderboard-name{font-size:1.1em}
+.result-leaderboard .leaderboard-stats{font-size:1em}
+@media(max-width:800px){.loadout-panel .mission-leaderboard .leaderboard-entries p:not(.leaderboard-empty){font-size:12px}.loadout-panel .mission-leaderboard .leaderboard-name{font-size:1.05em}.loadout-panel .mission-leaderboard .leaderboard-stats{font-size:.95em}.result-leaderboard .leaderboard-entries p:not(.leaderboard-empty){font-size:13px}.result-leaderboard .leaderboard-name{font-size:1.05em}}
+.loadout-panel .mission-leaderboard .leaderboard-entries{max-height:min(42vh,360px);overflow-y:auto;overscroll-behavior:contain}
+@media(max-width:800px){.loadout-panel .mission-leaderboard .leaderboard-entries{max-height:34dvh}}
+

@@ -2,7 +2,6 @@
 const ctx = canvas.getContext("2d");
 const floorLabel = document.getElementById("floorLabel");
 const missionLabel = document.getElementById("missionLabel");
-const timerLabel = document.getElementById("timerLabel");
 const weaponLabel = document.getElementById("weaponLabel");
 const statusText = document.getElementById("statusText");
 const pauseButton = document.getElementById("pauseButton");
@@ -37,7 +36,10 @@ const weaponStats = {
   rifle: { label: "Assault Rifle", cooldown: 0.18, damage: 25, speed: 540, radius: 5, spread: 0.025, recoil: 2, impact: "spark" },
   smg: { label: "Rapid SMG", cooldown: 0.07, damage: 11, speed: 600, radius: 3, spread: 0.12, recoil: 1, impact: "spark" },
   heavy: { label: "Heavy Cannon", cooldown: 0.55, damage: 100, speed: 400, radius: 9, spread: 0.012, recoil: 7, impact: "burst" },
+  scatter: { label: "Scatter Blaster", cooldown: 0.72, damage: 18, speed: 470, radius: 4, spread: 0.3, recoil: 5, impact: "burst", pellets: 5 },
+  burst: { label: "Burst Rifle", cooldown: 0.48, damage: 18, speed: 590, radius: 4, spread: 0.045, recoil: 2, impact: "spark", pellets: 3 },
 };
+const operatorStyle = { name: storageGet("sgtOperatorName", "OPERATOR 01"), accessory: storageGet("sgtOperatorAccessory", "none") };
 const arenaModifiers = [
   { id: "reactor", title: "REACTOR SURGE", detail: "Energy bursts sweep across the arena." },
   { id: "lowGravity", title: "LOW GRAVITY", detail: "Movement and enemy drift are amplified." },
@@ -67,23 +69,25 @@ const tutorialLessons = [
   { title: "DASHING", detail: "Use your dash control to quickly reposition and briefly avoid damage. Time it to pass through incoming attacks." },
   { title: "PICKUPS & RECOVERY", detail: "Walk over weapon and rocket pickups to collect them. Medkits restore health; rockets deal area damage to groups." },
   { title: "FIELD SKILLS", detail: "Use dash to evade attacks, float to change elevation, and wall-kick by pushing into an arena edge. Keep moving during every fight." },
-  { title: "GRUNT", detail: "Grunts chase you across the arena. Keep moving and aim before firing.", enemy: "grunt" },
-  { title: "RUNNER", detail: "Runners rush in with a knife and strike at close range. Dash away or through danger to evade their attack.", enemy: "runner" },
-  { title: "RANGED GUNNER", detail: "Gunners keep their distance and shoot aimed projectiles. Watch for the attack tell and dodge sideways.", enemy: "gunner" },
-  { title: "ARMORED HOSTILE", detail: "Armored enemies take reduced weapon damage. Use a Heavy Cannon if available, or keep firing while avoiding their shots.", enemy: "armored" },
-  { title: "EXPLODER", detail: "Exploders sprint toward you and detonate nearby. Keep your distance and shoot them before they get close.", enemy: "exploder" },
-  { title: "MEDIC", detail: "Medics hang back and restore nearby allies. Prioritize them so the rest of the group cannot recover.", enemy: "medic", ally: "grunt" },
-  { title: "TELEPORTER", detail: "Teleporters blink to new positions, making their movement unpredictable. Track their new location before aiming.", enemy: "teleporter" },
-  { title: "SPLITTER", detail: "A Splitter deploys two fast Runners when defeated. Be ready to reposition as soon as it breaks apart.", enemy: "splitter" },
-  { title: "SHIELDBEARER", detail: "Shieldbearers protect enemies behind their shield. Flank them or reposition until you have a clear shot.", enemy: "shieldbearer", ally: "grunt" },
-  { title: "WARDEN  ▸  PHASE 1", detail: "The Warden tracks your position and fires aimed volleys. Keep moving and watch its attack tell.", enemy: "boss", bossPhase: 1 },
-  { title: "WARDEN  ▸  PHASE 2", detail: "At 75% health, the Warden alternates aimed shots with a radial nova. Read the charge and move through the gaps.", enemy: "boss", bossPhase: 2 },
-  { title: "WARDEN  ▸  PHASE 3", detail: "Below 30% health, the Warden marks your position for bombardment. Keep moving and escape each impact zone.", enemy: "boss", bossPhase: 3 },
+  { title: "GRUNT", detail: "Grunts chase you, then flash a red charge line before lunging. Sidestep the line and punish the recovery.", enemy: "grunt" },
+  { title: "RUNNER", detail: "Runners rush in with a knife. Watch for the knife swing and dash away or through the strike.", enemy: "runner" },
+  { title: "RANGED GUNNER", detail: "Gunners keep their distance. A gold targeting line signals a charged shot; break the line before it fires.", enemy: "gunner" },
+  { title: "ARMORED HOSTILE", detail: "Armored enemies resist most weapons. A purple expanding circle marks their ground slam; escape its radius, then attack.", enemy: "armored" },
+  { title: "EXPLODER", detail: "Exploders sprint toward you and flash an orange blast ring before detonating. Shoot them early or leave the marked radius.", enemy: "exploder" },
+  { title: "MEDIC", detail: "Medics hang back and heal nearby allies. A green energy link shows who they are restoring; prioritize the Medic.", enemy: "medic", ally: "grunt" },
+  { title: "TELEPORTER", detail: "Teleporters blink when their purple energy ring flares. Track the particles at their new position before aiming.", enemy: "teleporter" },
+  { title: "SPLITTER", detail: "A Splitter releases two fast Runners when defeated. Keep firing, then reposition as soon as it breaks apart.", enemy: "splitter" },
+  { title: "SHIELDBEARER", detail: "Shieldbearers guard enemies behind them. A blue charge line warns of their rush; dodge it, then flank their shield.", enemy: "shieldbearer", ally: "grunt" },
+  { title: "WARDEN  ▸  PHASE 1", detail: "The Warden tracks your position and fires aimed volleys. The red attack tell means a shot is close; keep moving and dodge sideways.", enemy: "boss", bossPhase: 1 },
+  { title: "WARDEN  ▸  PHASE 2", detail: "At 75% health, an orange ring signals the radial Nova. Move through the gaps as it expands; fan volleys alternate with the Nova.", enemy: "boss", bossPhase: 2 },
+  { title: "WARDEN  ▸  PHASE 3", detail: "Below 30% health, a red lock line marks your position before bombardment. Leave every impact circle; attack count and warning time scale with difficulty.", enemy: "boss", bossPhase: 3 },
 ];
-const towerFloorEnemyCounts = [0, 5, 7, 9, 11, 13, 1, 11, 13, 15, 17, 4];
+const towerFloorEnemyCounts = [0, 6, 8, 11, 13, 16, 1, 14, 16, 18, 21, 5];
 function storageGet(key, fallback = null) { try { return localStorage.getItem(key) ?? fallback; } catch (_) { return fallback; } }
 function storageSet(key, value) { try { localStorage.setItem(key, String(value)); } catch (_) { /* Storage can be disabled by the browser. */ } }
 let audioContext = null;
+let backgroundMusicTimer = null;
+let backgroundMusicStep = 0;
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
@@ -131,7 +135,7 @@ const state = {
   levelCleared: false,
   score: 0,
   runTime: 0,
-  weaponAmmo: { rifle: 0, smg: 0, heavy: 0 },
+  weaponAmmo: { rifle: 0, smg: 0, heavy: 0, scatter: 0, burst: 0 },
   rocketPickup: null,
   rocketSpawnTimer: 0,
   healPickup: null,
@@ -163,6 +167,7 @@ const state = {
   bombTimer: 0,
   bombZones: [],
   blackoutActive: 0,
+  blackoutCooldown: 8,
   survivalEvent: null,
   eventTimer: 0,
   lastStandActive: false,
@@ -221,7 +226,7 @@ function damageEnemy(enemy, damage, x, y, particleColor = "#9ae6ff", weaponType 
   playTone(damage >= 3 ? 120 : 250, 0.035, "square", 0.008);
   if (enemy.isBoss && !enemy.phaseTwo && enemy.hp <= enemy.maxHp * 0.75) {
     enemy.phaseTwo = true;
-    enemy.speed *= isHardFloorSixWarden() ? 1.2 : 1.25;
+    enemy.speed *= isHardTowerWarden() ? 1.2 : 1.25;
     enemy.fireCooldown = 0.15;
     enemy.phaseChangeTimer = 1.4;
     triggerScreenShake(5, 0.28, enemy.x, enemy.y);
@@ -230,7 +235,7 @@ function damageEnemy(enemy, damage, x, y, particleColor = "#9ae6ff", weaponType 
   }
   if (enemy.isBoss && enemy.phaseTwo && !enemy.phaseThree && enemy.hp <= enemy.maxHp * 0.3) {
     enemy.phaseThree = true;
-    enemy.speed *= isHardFloorSixWarden() ? 1.06 : 1.1;
+    enemy.speed *= isHardTowerWarden() ? 1.06 : 1.1;
     enemy.attackPattern = "fan";
     enemy.fireCooldown = 0.25;
     enemy.phaseChangeTimer = 1.8;
@@ -335,6 +340,57 @@ const achievementDefinitions = [
 function savedProgress(key, fallback = {}) {
   try { return JSON.parse(storageGet(key, JSON.stringify(fallback))) || fallback; } catch (_) { return fallback; }
 }
+function getLeaderboardThreat(mode = state.mode) {
+  return mode === "tower" ? settings.difficulty : mode === "survival" ? state.screen === "menu" ? "EASY" : getSurvivalThreatLabel() : "normal";
+}
+function leaderboardStorageKey(mode, threat) {
+  const threatKey = String(threat).toLowerCase().replace(/\+/g, " plus ").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return `sgtLeaderboardV2-${mode}-${threatKey}`;
+}
+function saveLeaderboardEntry(mode, threat, score, duration, cleared = false) {
+  const key = leaderboardStorageKey(mode, threat);
+  const board = savedProgress(key, []);
+  const entry = { name: String(operatorStyle.name || "OPERATOR").trim().slice(0, 14) || "OPERATOR", mode, threat, score: Math.max(0, Math.floor(score)), duration: Math.max(0, Number(duration) || 0), cleared: Boolean(cleared), date: new Date().toISOString().slice(0, 10) };
+  board.push(entry);
+  board.sort((a, b) => b.score - a.score || a.duration - b.duration);
+  const ranked = board.slice(0, 11);
+  storageSet(key, JSON.stringify(ranked));
+  const rank = ranked.findIndex(item => item === entry);
+  return rank < 0 ? null : rank + 1;
+}
+function renderLeaderboard(nodeId = "leaderboardList", mode = state.mode, threat = getLeaderboardThreat(mode), limit = 11) {
+  const node = document.getElementById(nodeId);
+  if (!node) return;
+  const board = savedProgress(leaderboardStorageKey(mode, threat), []);
+  node.replaceChildren();
+  if (!board.length) {
+    const empty = document.createElement("p");
+    empty.className = "leaderboard-empty";
+    empty.textContent = nodeId === "missionLeaderboardList" ? "No runs saved for this threat yet." : "No saved runs yet. Finish a run to post your callsign.";
+    node.appendChild(empty);
+    return;
+  }
+  board.slice(0, limit).forEach((entry, index) => {
+    const row = document.createElement("p");
+    if (entry.cleared) row.classList.add("leaderboard-cleared");
+    const rank = document.createElement("span");
+    rank.className = "leaderboard-rank";
+    if (index < 3) rank.classList.add(["rank-gold", "rank-silver", "rank-bronze"][index]);
+    rank.textContent = String(index + 1).padStart(2, "0");
+    const details = document.createElement("span");
+    details.className = "leaderboard-details";
+    const name = document.createElement("span");
+    name.className = "leaderboard-name";
+    name.classList.add(index < 3 ? ["rank-gold", "rank-silver", "rank-bronze"][index] : "rank-gray");
+    name.textContent = entry.name;
+    const stats = document.createElement("span");
+    stats.className = "leaderboard-stats";
+    stats.textContent = `${entry.score.toLocaleString()} pts  ▸  ${formatTime(entry.duration)}`;
+    details.append(name, stats);
+    row.append(rank, details);
+    node.appendChild(row);
+  });
+}
 let weaponMasteryCache = null;
 function getWeaponMastery() {
   if (!weaponMasteryCache) weaponMasteryCache = savedProgress("sgtWeaponMastery", {});
@@ -401,6 +457,9 @@ function renderRecords() {
     const rank = kills >= goals[weapon] * 2 ? "ELITE TINT" : kills >= goals[weapon] ? "EXPERT TINT" : "ROOKIE";
     return `<p>${weaponStats[weapon].label}: ${kills}/${goals[weapon]} kills  ▸  ${rank}</p>`;
   }).join("")}`;
+  const recordsBoardTitle = document.getElementById("recordsLeaderboardTitle");
+  if (recordsBoardTitle) recordsBoardTitle.textContent = `${state.mode.toUpperCase()} // ${getLeaderboardThreat().toUpperCase()} THREAT`;
+  renderLeaderboard();
 }
 
 function formatTime(seconds) {
@@ -448,27 +507,31 @@ function getWardenDifficultyProfile() {
     },
   };
   const profile = profiles[difficulty] || profiles.normal;
-  if (state.mode === "tower" && state.floor === 6 && settings.difficulty === "hard") {
+  if (state.mode === "tower" && [6, 11].includes(state.floor) && settings.difficulty === "hard") {
     return {
       ...profile,
-      novaCooldown: profile.novaCooldown * 1.1,
-      novaWarning: profile.novaWarning + 0.08,
-      novaShots: 10,
-      novaDamage: profile.novaDamage * 0.92,
-      barrageCooldown: profile.barrageCooldown * 1.1,
-      barrageCharge: profile.barrageCharge + 0.08,
-      barrageCount: 3,
-      barrageWarning: profile.barrageWarning + 0.08,
-      barrageDamage: profile.barrageDamage * 0.92,
-      barrageRadius: profile.barrageRadius * 0.94,
-      fanOffsets: [-0.42, -0.28, -0.14, 0, 0.14, 0.28, 0.42],
+      novaCooldown: profile.novaCooldown * 1.2,
+      novaWarning: profile.novaWarning + 0.16,
+      novaShots: 8,
+      novaDamage: profile.novaDamage * 0.85,
+      novaSpeed: profile.novaSpeed * 0.94,
+      barrageCooldown: profile.barrageCooldown * 1.2,
+      barrageCharge: profile.barrageCharge + 0.16,
+      barrageCount: 2,
+      barrageWarning: profile.barrageWarning + 0.18,
+      barrageDamage: profile.barrageDamage * 0.85,
+      barrageRadius: profile.barrageRadius * 0.92,
+      summonCooldown: profile.summonCooldown * 1.2,
+      summonCount: 3,
+      summonShieldChance: profile.summonShieldChance * 0.75,
+      fanOffsets: [-0.34, -0.17, 0, 0.17, 0.34],
     };
   }
   return profile;
 }
 
-function isHardFloorSixWarden() {
-  return state.mode === "tower" && state.floor === 6 && settings.difficulty === "hard";
+function isHardTowerWarden() {
+  return state.mode === "tower" && [6, 11].includes(state.floor) && settings.difficulty === "hard";
 }
 
 function getSurvivalThreatLabel() {
@@ -496,6 +559,42 @@ function playTone(frequency = 180, duration = 0.055, type = "square", volume = 0
     oscillator.start();
     oscillator.stop(audioContext.currentTime + duration);
   } catch (_) { /* Audio is optional; gameplay still works if the browser blocks it. */ }
+}
+
+function stopBackgroundMusic() {
+  if (backgroundMusicTimer !== null) clearInterval(backgroundMusicTimer);
+  backgroundMusicTimer = null;
+}
+
+function startBackgroundMusic() {
+  stopBackgroundMusic();
+  if (!settings.sound || state.screen !== "playing") return;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    audioContext ||= new AudioCtx();
+    if (audioContext.state === "suspended") audioContext.resume();
+    const melody = [220, 261.63, 293.66, 261.63, 196, 220, 246.94, 220];
+    backgroundMusicTimer = setInterval(() => {
+      if (!settings.sound || state.screen !== "playing" || !audioContext) {
+        stopBackgroundMusic();
+        return;
+      }
+      const now = audioContext.currentTime;
+      const frequency = melody[backgroundMusicStep++ % melody.length];
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(0.012, now + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.62);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.64);
+    }, 480);
+  } catch (_) { stopBackgroundMusic(); }
 }
 
 function closeMenuPanels() {
@@ -560,6 +659,10 @@ function showResult(victory = false) {
   document.getElementById("resultTime").textContent = formatTime(state.runTime);
   const recordKey = state.mode === "tower" ? "sgtTowerBestScore" : "sgtSurvivalBestScore";
   const previousBest = Number(storageGet(recordKey, "0")) || 0;
+  const leaderboardThreat = getLeaderboardThreat(state.mode);
+  const leaderboardRank = saveLeaderboardEntry(state.mode, leaderboardThreat, state.score, state.runTime, victory && state.mode === "tower");
+  document.getElementById("resultLeaderboardTitle").textContent = `${state.mode.toUpperCase()} ${leaderboardThreat.toUpperCase()} THREAT`;
+  renderLeaderboard("resultLeaderboardList", state.mode, leaderboardThreat);
   const best = Math.max(previousBest, state.score);
   const newRecord = state.score > previousBest;
   storageSet(recordKey, best);
@@ -567,7 +670,9 @@ function showResult(victory = false) {
   document.getElementById("resultBestScore").textContent = String(best).padStart(6, "0");
   document.getElementById("resultEnemies").textContent = String(state.enemiesDefeated);
   document.getElementById("resultRockets").textContent = String(state.rocketsUsed);
-  document.getElementById("resultRecord").textContent = newRecord ? "NEW PERSONAL RECORD" : "PERSONAL RECORD NOT BEATEN";
+  document.getElementById("resultRecord").textContent = leaderboardRank
+    ? `${operatorStyle.name}  ▸  LOCAL RANK #${leaderboardRank}`
+    : newRecord ? "NEW PERSONAL RECORD" : "SCORE OUTSIDE LOCAL TOP 10";
   document.getElementById("resultMode").textContent = state.mode === "tower"
     ? `${settings.difficulty.toUpperCase()} TOWER RUN`
     : state.mode === "survival" ? `${getSurvivalThreatLabel()} SURVIVAL  ▸  FLOOR ${state.floor}` : "TRAINING SIM";
@@ -586,7 +691,6 @@ function showResult(victory = false) {
 
 function updateHud() {
   floorLabel.textContent = `Floor ${state.floor}`;
-  timerLabel.textContent = formatTime(state.runTime);
   missionLabel.textContent = state.paused
     ? "Mission: paused"
     : state.gameOver
@@ -598,7 +702,6 @@ function updateHud() {
   pauseButton.textContent = state.paused ? "Resume" : "Pause";
   pauseButton.setAttribute("aria-pressed", String(state.paused));
   pauseButton.disabled = state.gameOver;
-  weaponLabel.textContent = weaponStats[state.weapon].label;
 }
 
 function updateControlHints() {
@@ -606,16 +709,14 @@ function updateControlHints() {
   const touch = settings.controlScheme === "touch";
   document.body.classList.toggle("mouse-aim-enabled", !classic && !touch);
   document.body.classList.toggle("touch-controls-enabled", touch);
-  document.getElementById("aimKeyHint").textContent = classic ? "A / D / W / S" : touch ? "Aim stick" : "Mouse";
-  document.getElementById("aimHint").textContent = classic ? "Aim in the direction you move" : touch ? "Use the right stick to aim" : "Aim with the cursor";
-  document.getElementById("mouseFireControl").classList.toggle("hidden", classic || touch);
-  document.getElementById("classicFireControl").classList.toggle("hidden", !classic);
-  document.getElementById("rocketKeyHint").textContent = classic ? "L" : touch ? "Touch" : "Right click";
+  document.getElementById("moveKeyHint").textContent = classic ? "A / D / W / S" : touch ? "Left stick" : "A / D + W / S";
+  document.getElementById("fireKeyHint").textContent = classic ? "J" : touch ? "Aim edge" : "Left click";
+  document.getElementById("rocketKeyHint").textContent = classic ? "L" : touch ? "Rocket btn" : "Right click";
   document.getElementById("menuWeaponHint").textContent = classic ? "J FIRE EQUIPPED  ▸  PICKUPS AUTO-EQUIP" : touch ? "TOUCH AIM / MOVE  ▸  EDGE TO FIRE" : "PICKUPS AUTO-EQUIP  ▸  LEFT CLICK FIRE";
   document.getElementById("menuFireHint").textContent = classic ? "K DASH  ▸  L ROCKET" : touch ? "DASH LEFT  ▸  ROCKET ABOVE AIM" : "SPACE DASH  ▸  RIGHT CLICK ROCKET";
   document.getElementById("dashKeyHint").textContent = classic ? "K" : touch ? "Touch" : "Space";
   document.getElementById("helpDashHint").textContent = classic ? "K" : touch ? "Touch dash button" : "Space";
-  document.getElementById("pauseKeyHint").textContent = classic ? "ESC" : "P / ESC";
+  document.getElementById("pauseKeyHint").textContent = "ESC";
   document.getElementById("helpPauseHint").textContent = classic ? "ESC" : "P / ESC";
   document.getElementById("helpClassicControls").classList.toggle("hidden", !classic);
   document.getElementById("helpMouseControls").classList.toggle("hidden", classic || touch);
@@ -627,6 +728,10 @@ function updateControlHints() {
 
 function renderTutorialLesson() {
   const lesson = tutorialLessons[state.tutorialLesson];
+  const tutorialPanel = document.getElementById("tutorialPanel");
+  tutorialPanel.classList.remove("lesson-change");
+  void tutorialPanel.offsetWidth;
+  tutorialPanel.classList.add("lesson-change");
   const touch = settings.controlScheme === "touch";
   const classic = settings.controlScheme === "classic";
   const controls = touch
@@ -659,8 +764,8 @@ function performDash() {
   }
   directionX /= directionLength;
   directionY /= directionLength;
-  const dashX = directionX * 95;
-  const dashY = directionY * 95;
+  const dashX = directionX * 110;
+  const dashY = directionY * 110;
   player.x = clamp(player.x + dashX, 30, WIDTH - 30);
   player.y = clamp(player.y + dashY, 30, HEIGHT - 30);
   player.vx = directionX * 420;
@@ -724,6 +829,7 @@ function createEnemy(forcedType = null) {
   }
   const boss = type === "boss";
   if (boss) type = "boss";
+  const hardTowerBoss = boss && isHardTowerWarden();
   const elite = state.mode === "survival" && state.runTime >= 90 && Math.random() < Math.min(0.24, 0.06 + state.runTime / 1800);
   if (elite && !boss) type = "armored";
   const profiles = {
@@ -736,7 +842,7 @@ function createEnemy(forcedType = null) {
     teleporter: { speed: 105, hp: 100, cooldown: 1.8, behavior: "teleport", color: "#d49aff" },
     splitter: { speed: 88, hp: 150, cooldown: 0, behavior: "split", color: "#ffad5c" },
     shieldbearer: { speed: 56, hp: 225, cooldown: 2.7, behavior: "shield", color: "#80b6ff" },
-    boss: { speed: 78, hp: 2000 + Math.min(state.floor, 12) * 100, cooldown: 1.05, behavior: "boss", color: "#ff9275" },
+    boss: { speed: 78, hp: (2000 + Math.min(state.floor, 12) * 100) * (hardTowerBoss ? 0.9 : 1), cooldown: 1.05, behavior: "boss", color: "#ff9275" },
   };
   const profile = profiles[type];
   const scale = state.mode === "survival" ? state.threatScale : 1;
@@ -746,7 +852,7 @@ function createEnemy(forcedType = null) {
     y: rand(110, HEIGHT - 110),
     width: boss ? 38 : type === "armored" ? 24 : 18,
     height: boss ? 84 : 54,
-    speed: profile.speed * difficulty.speed * Math.min(scale, 1.5) * (boss && isHardFloorSixWarden() ? 0.96 : 1),
+    speed: profile.speed * difficulty.speed * Math.min(scale, 1.5) * (hardTowerBoss ? 0.94 : 1),
     vx: rand(-60, 60), vy: rand(-45, 45),
     hp, maxHp: hp,
     fireCooldown: rand(profile.cooldown * 0.75, profile.cooldown * 1.35) / (difficulty.fireRate * Math.min(scale, 1.65)),
@@ -797,7 +903,7 @@ function spawnHealPickup() {
 }
 
 function spawnWeaponPickup() {
-  const weapons = ["rifle", "smg", "heavy"];
+  const weapons = ["rifle", "smg", "heavy", "scatter", "burst"];
   const weapon = weapons[Math.floor(Math.random() * weapons.length)];
   state.weaponPickup = {
     x: rand(220, WIDTH - 220),
@@ -829,8 +935,7 @@ function updateWeaponPickup(dt) {
   if (state.weaponPickup) return;
   state.weaponSpawnTimer -= dt;
   if (state.weaponSpawnTimer > 0) return;
-  spawnWeaponPickup();
-  state.weaponSpawnTimer = rand(5, 9);
+  spawnWeaponPickup(); state.weaponSpawnTimer = rand(5, 9);
 }
 
 function updateRocketPickup(dt) {
@@ -1035,6 +1140,8 @@ function resetRun() {
   state.weaponAmmo.rifle = 0;
   state.weaponAmmo.smg = 0;
   state.weaponAmmo.heavy = 0;
+  state.weaponAmmo.scatter = 0;
+  state.weaponAmmo.burst = 0;
   state.weapon = "pistol";
   state.floorStartingHp = player.maxHp;
   state.dailyProgress = 0;
@@ -1063,14 +1170,14 @@ function hitPlayer(amount) {
   if (player.hp <= 0) {
     player.hp = 0;
     state.gameOver = true;
-    setStatus("You were knocked out. Press R to restart.");
+    setStatus("Player 1 knocked out.");
     showResult(false);
   }
 }
 
 function findLoadedWeapon(preferredWeapon = state.weapon) {
   if (preferredWeapon !== "pistol" && state.weaponAmmo[preferredWeapon] > 0) return preferredWeapon;
-  return ["rifle", "smg", "heavy"].find(weapon => state.weaponAmmo[weapon] > 0) || "pistol";
+  return ["rifle", "smg", "heavy", "scatter", "burst"].find(weapon => state.weaponAmmo[weapon] > 0) || "pistol";
 }
 
 function shootPlayer(useRocket = false, selectedWeapon = state.weapon) {
@@ -1117,7 +1224,9 @@ function shootPlayer(useRocket = false, selectedWeapon = state.weapon) {
   const arenaFireRate = state.arenaModifier?.id === "overdrive" ? 1.2 : 1;
   player.fireCooldown = weapon.cooldown / arenaFireRate;
   const spread = weapon.spread;
-  const shotAngles = [0];
+  const shotAngles = weapon.pellets
+    ? Array.from({ length: weapon.pellets }, (_, i) => (i - (weapon.pellets - 1) / 2) * (weaponType === "scatter" ? 0.14 : 0.035))
+    : [0];
   for (const offset of shotAngles) {
     const angle = player.angle + rand(-spread, spread) + offset;
     state.bullets.push({
@@ -1163,7 +1272,7 @@ function shootEnemy(enemy) {
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       radius: enemy.isBoss ? 6 : 5,
-        damage: (enemy.isBoss ? 12 * (enemy.phaseThree ? 1.2 : enemy.phaseTwo ? 1.25 : 1) : enemy.type === "gunner" ? 7 : 8) * getDifficultyStats().damage * Math.min(state.threatScale, 1.4) * (state.lastStandActive ? 1.25 : 1) * (enemy.isBoss && isHardFloorSixWarden() ? 0.92 : 1),
+        damage: (enemy.isBoss ? 12 * (enemy.phaseThree ? 1.2 : enemy.phaseTwo ? 1.25 : 1) : enemy.type === "gunner" ? 7 : 8) * getDifficultyStats().damage * Math.min(state.threatScale, 1.4) * (state.lastStandActive ? 1.25 : 1) * (enemy.isBoss && isHardTowerWarden() ? 0.85 : 1),
       team: "enemy",
     });
   }
@@ -1438,7 +1547,7 @@ function updatePlayer(dt) {
 
   if (state.weaponPickup && Math.hypot(player.x - state.weaponPickup.x, player.y - state.weaponPickup.y) < 34) {
     const pickedUpWeapon = state.weaponPickup.weapon;
-    const ammoGranted = pickedUpWeapon === "rifle" ? 15 : pickedUpWeapon === "smg" ? 30 : 3;
+    const ammoGranted = pickedUpWeapon === "rifle" ? 15 : pickedUpWeapon === "smg" ? 30 : pickedUpWeapon === "scatter" ? 5 : pickedUpWeapon === "burst" ? 8 : 3;
     state.weaponAmmo[pickedUpWeapon] += ammoGranted;
     state.weapon = pickedUpWeapon;
     setStatus(`${weaponStats[pickedUpWeapon].label} equipped! +${ammoGranted} shots.`);
@@ -1782,7 +1891,7 @@ function updateEnemies(dt) {
       shootEnemy(enemy);
       enemy.skillTimer = 0.22;
       enemy.skillKind = "fire";
-      enemy.fireCooldown = (enemy.isBoss ? enemy.phaseThree ? 0.9 : enemy.phaseTwo ? 1.05 : 1.55 : enemy.type === "gunner" ? 1.9 : enemy.type === "teleporter" ? 2.2 : 2.8) / (getDifficultyStats().fireRate * Math.min(state.threatScale, 1.6)) * (enemy.isBoss && isHardFloorSixWarden() ? 1.08 : 1);
+      enemy.fireCooldown = (enemy.isBoss ? enemy.phaseThree ? 0.9 : enemy.phaseTwo ? 1.05 : 1.55 : enemy.type === "gunner" ? 1.9 : enemy.type === "teleporter" ? 2.2 : 2.8) / (getDifficultyStats().fireRate * Math.min(state.threatScale, 1.6)) * (enemy.isBoss && isHardTowerWarden() ? 1.18 : 1);
       if (enemy.isBoss && enemy.phaseTwo && !enemy.phaseThree) enemy.attackPattern = enemy.attackPattern === "fan" ? "aimed" : "fan";
     }
 
@@ -1938,7 +2047,7 @@ function updateArenaModifier(dt) {
     else {
       state.arenaTimer -= dt;
       if (state.arenaTimer <= 0) {
-        state.blackoutActive = 2;
+        state.blackoutActive = 4;
         state.arenaTimer = 8;
         setStatus("BLACKOUT  ▸  VISIBILITY REDUCED");
       }
@@ -2031,6 +2140,10 @@ function drawPlayer() {
   ctx.beginPath();
   ctx.arc(0, -18 + Math.sin(gait * 2) * moveAmount, 12, 0, Math.PI * 2);
   ctx.stroke();
+  if (operatorStyle.accessory === "visor") { ctx.fillStyle = "#66f4ff"; ctx.fillRect(-9, -21, 18, 4); }
+  if (operatorStyle.accessory === "crown") { ctx.beginPath(); ctx.moveTo(-8, -30); ctx.lineTo(-8, -36); ctx.lineTo(-3, -32); ctx.lineTo(0, -39); ctx.lineTo(3, -32); ctx.lineTo(8, -36); ctx.lineTo(8, -30); ctx.closePath(); ctx.fillStyle = "#ffd45d"; ctx.fill(); }
+  if (operatorStyle.accessory === "bandana") { ctx.fillStyle = "#ff6464"; ctx.fillRect(-10, -28, 20, 5); ctx.fillRect(8, -27, 7, 3); }
+  ctx.save(); ctx.rotate(-player.angle); ctx.fillStyle = "#dff7ff"; ctx.font = "700 10px Orbitron, sans-serif"; ctx.textAlign = "center"; ctx.fillText(operatorStyle.name, 0, -43); ctx.restore();
 
   ctx.beginPath();
   ctx.moveTo(0, -6);
@@ -2480,7 +2593,7 @@ function drawHudBars() {
   // Anchor the canvas HUD to the real topbar so it stays just below the
   // floor / mission panel at every shell size and responsive breakpoint.
   const panelX = clamp((topbarRect.left - canvasRect.left + 8) * scaleX, 8, WIDTH - 478);
-  const panelY = clamp((topbarRect.bottom - canvasRect.top + 8) * scaleY, 8, HEIGHT - 76);
+  const panelY = clamp((topbarRect.bottom - canvasRect.top + 8) * scaleY, 8, HEIGHT - 140);
   const panelWidth = 470;
   const panelHeight = 68;
   const barX = panelX + 12;
@@ -2572,13 +2685,51 @@ function drawHudBars() {
   ctx.font = "700 18px Orbitron, Segoe UI, sans-serif";
   ctx.fillText(String(state.weaponAmmo.heavy), panelX + 416, panelY + 51);
 
-  ctx.textAlign = "right";
-  ctx.fillStyle = "rgba(255,255,255,0.8)";
-  ctx.font = "600 16px Orbitron, Segoe UI, sans-serif";
-  ctx.fillText(`Score ${state.score}`, 1248, barY + 14);
+  const scoreBoxX = WIDTH - 244;
+  const scoreBoxY = panelY;
+  const scoreBoxWidth = 226;
+  const blackout = state.arenaModifier?.id === "blackout";
+  const scoreBoxHeight = blackout ? 126 : 94;
+  ctx.shadowColor = blackout ? "#ffbd46" : "rgba(255,74,57,.24)";
+  ctx.shadowBlur = blackout ? 18 : 10;
+  ctx.fillStyle = "rgba(13, 9, 13, 0.94)";
+  ctx.strokeStyle = blackout ? "#ffc857" : "rgba(255,100,86,.58)";
+  ctx.lineWidth = blackout ? 2 : 1.5;
+  ctx.beginPath();
+  ctx.roundRect(scoreBoxX, scoreBoxY, scoreBoxWidth, scoreBoxHeight, 9);
+  ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffb1a8";
+  ctx.font = "700 9px Orbitron, Segoe UI, sans-serif";
+  ctx.fillText("SCORE", scoreBoxX + scoreBoxWidth / 2, scoreBoxY + 17);
+  ctx.fillStyle = "#fff";
+  ctx.font = "800 20px Orbitron, Segoe UI, sans-serif";
+  ctx.fillText(String(state.score).padStart(6, "0"), scoreBoxX + scoreBoxWidth / 2, scoreBoxY + 41);
+  ctx.strokeStyle = "#ffffff24"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(scoreBoxX + 14, scoreBoxY + 50); ctx.lineTo(scoreBoxX + scoreBoxWidth - 14, scoreBoxY + 50); ctx.stroke();
+  ctx.fillStyle = "#d3d8df";
+  ctx.font = "600 8px Orbitron, Segoe UI, sans-serif";
+  ctx.fillText("RUN TIME", scoreBoxX + scoreBoxWidth / 2, scoreBoxY + 64);
+  ctx.fillStyle = "#fff2bc";
+  ctx.font = "700 16px Orbitron, Segoe UI, sans-serif";
+  ctx.fillText(formatTime(state.runTime), scoreBoxX + scoreBoxWidth / 2, scoreBoxY + 84);
   ctx.fillStyle = "#ffe2a5";
-  ctx.font = "600 11px Orbitron, Segoe UI, sans-serif";
-  ctx.fillText(`${state.killStreak > 1 ? `${state.killStreak}X COMBO` : "COMBAT READY"}`, 1248, barY + 31);
+  ctx.font = "600 8px Orbitron, Segoe UI, sans-serif";
+  ctx.fillText(`${state.killStreak > 1 ? `${state.killStreak}X COMBO` : "COMBAT READY"}`, scoreBoxX + scoreBoxWidth / 2, scoreBoxY + 92);
+  if (blackout) {
+    const lightTimer = state.blackoutActive > 0
+      ? `LIGHT RETURNS IN 0:${String(Math.ceil(state.blackoutActive)).padStart(2, "0")}`
+      : `BLACKOUT IN 0:${String(Math.ceil(state.arenaTimer)).padStart(2, "0")}`;
+    const pulse = 0.75 + (Math.sin(state.time * 8) + 1) * 0.12;
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = "#ffd15a";
+    ctx.beginPath(); ctx.roundRect(scoreBoxX + 10, scoreBoxY + 99, scoreBoxWidth - 20, 20, 4); ctx.fill();
+    ctx.fillStyle = "#211405";
+    ctx.font = "900 9px Orbitron, Segoe UI, sans-serif";
+    ctx.fillText(`⚠ ${lightTimer}`, scoreBoxX + scoreBoxWidth / 2, scoreBoxY + 113);
+    ctx.globalAlpha = 1;
+  }
+  ctx.textAlign = "left";
   ctx.textAlign = "left";
   ctx.restore();
 }
@@ -2764,12 +2915,12 @@ function drawWorld() {
   if (state.arenaModifier?.id === "blackout" && state.blackoutActive > 0 && state.screen === "playing") {
     ctx.fillStyle = "rgba(2, 3, 6, 0.99)";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
-    const playerLight = ctx.createRadialGradient(player.x, player.y, 6, player.x, player.y, 88);
+    const playerLight = ctx.createRadialGradient(player.x, player.y, 12, player.x, player.y, 158);
     playerLight.addColorStop(0, "rgba(255, 226, 190, 0.24)");
     playerLight.addColorStop(0.35, "rgba(255, 190, 145, 0.12)");
     playerLight.addColorStop(1, "rgba(255, 150, 120, 0)");
     ctx.fillStyle = playerLight;
-    ctx.fillRect(player.x - 88, player.y - 88, 176, 176);
+    ctx.fillRect(player.x - 158, player.y - 158, 316, 316);
     drawPlayer();
   }
   if (document.body.classList.contains("playing")) drawHudBars();
@@ -2829,11 +2980,15 @@ function updateLoadoutSummary() {
   const scoreKey = state.mode === "survival" ? "sgtSurvivalBestScore" : "sgtTowerBestScore";
   document.getElementById("bestScore").textContent = String(Number(storageGet(scoreKey, "0")) || 0).padStart(6, "0");
   document.getElementById("bestScoreLabel").textContent = state.mode === "survival" ? "SURVIVAL BEST" : "TOWER BEST";
+  const leaderboardThreat = getLeaderboardThreat(state.mode);
+  document.getElementById("missionLeaderboardTitle").textContent = `${state.mode.toUpperCase()} ${leaderboardThreat.toUpperCase()} THREAT`;
+  renderLeaderboard("missionLeaderboardList", state.mode, leaderboardThreat, 11);
 }
 
 document.getElementById("playButton").addEventListener("click", () => {
   closeMenuPanels();
   document.getElementById("settingsRows").classList.add("hidden");
+  document.getElementById("operatorCustomize").classList.add("hidden");
   document.getElementById("towerDifficultyRow").classList.toggle("hidden", state.mode !== "tower");
   document.getElementById("confirmDeploy").classList.remove("hidden");
   loadoutPanel.classList.remove("hidden");
@@ -2842,6 +2997,7 @@ document.getElementById("playButton").addEventListener("click", () => {
 document.getElementById("settingsButton").addEventListener("click", () => {
   closeMenuPanels(); loadoutPanel.classList.remove("hidden");
   document.getElementById("settingsRows").classList.remove("hidden");
+  document.getElementById("operatorCustomize").classList.remove("hidden");
   document.getElementById("towerDifficultyRow").classList.add("hidden");
   document.getElementById("confirmDeploy").classList.add("hidden");
 });
@@ -2854,6 +3010,7 @@ document.querySelectorAll("[data-close]").forEach(button => button.addEventListe
   const panel = document.getElementById(button.dataset.close); panel.classList.add("hidden");
   if (panel === loadoutPanel) {
     document.getElementById("settingsRows").classList.add("hidden");
+    document.getElementById("operatorCustomize").classList.add("hidden");
     document.getElementById("towerDifficultyRow").classList.toggle("hidden", state.mode !== "tower");
     document.getElementById("confirmDeploy").classList.remove("hidden");
   }
@@ -2945,6 +3102,12 @@ settings.sound = storageGet("sgtSound", "true") !== "false";
 settings.shake = storageGet("sgtShake", "true") !== "false";
 document.getElementById("soundToggle").checked = settings.sound;
 document.getElementById("shakeToggle").checked = settings.shake;
+const operatorNameInput = document.getElementById("operatorName");
+const operatorAccessoryInput = document.getElementById("operatorAccessory");
+operatorNameInput.value = operatorStyle.name;
+operatorAccessoryInput.value = ["none", "visor", "crown", "bandana"].includes(operatorStyle.accessory) ? operatorStyle.accessory : "none";
+operatorNameInput.addEventListener("input", () => { operatorStyle.name = operatorNameInput.value.trim().slice(0, 14) || "OPERATOR"; storageSet("sgtOperatorName", operatorStyle.name); });
+operatorAccessoryInput.addEventListener("change", () => { operatorStyle.accessory = operatorAccessoryInput.value; storageSet("sgtOperatorAccessory", operatorStyle.accessory); });
 document.getElementById("resumeButton").addEventListener("click", togglePause);
 document.getElementById("restartButton").addEventListener("click", startMission);
 document.getElementById("retryButton").addEventListener("click", startMission);
