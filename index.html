@@ -17,8 +17,8 @@
 
     <div id="hud" class="in-game-only">
       <div id="topbar">
-        <span id="floorLabel">Floor 1</span>
-        <span id="missionLabel">Mission: clear the floor</span>
+        <span id="floorLabel">Sector 1</span>
+        <span id="missionLabel">Mission: clear the sector</span>
         <button id="pauseButton" type="button" aria-pressed="false">Pause</button>
       </div>
       <div id="statusText">Choose a mode and deploy.</div>
@@ -44,20 +44,20 @@
 
     <section id="mainMenu" class="screen-panel" aria-labelledby="gameTitle">
       <div class="menu-noise"></div>
-      <div class="menu-topline"><span class="live-dot"></span> SYSTEM ALERT // HOSTILE TOWER DETECTED <span class="topline-right">BUILD 0.9.6</span></div>
+      <div class="menu-topline"><span class="live-dot"></span> SYSTEM ALERT // HOSTILE SECTOR DETECTED <span class="topline-right">BUILD 0.9.6</span></div>
       <div class="menu-layout">
         <div class="menu-copy">
           <p class="eyebrow">COMBAT SIMULATION // OPERATOR 01</p>
           <h1 id="gameTitle">STICKMAN<br><span>GUN SPACE</span></h1>
-          <p class="menu-description">Breach eleven hostile floors. Adapt your loadout in combat, survive the crossfire, and set a new clear-time record.</p>
+          <p class="menu-description">Push through eleven hostile space sectors. Adapt your loadout in combat, survive the crossfire, and set a new clear-time record.</p>
           <div class="menu-actions">
             <button id="playButton" class="action-button action-primary" type="button"><span>▶</span> DEPLOY NOW</button>
             <button id="howToButton" class="action-button action-secondary" type="button">HOW TO PLAY <span>↗</span></button>
           </div>
           <label class="menu-control-preset" for="controlSchemeSelect"><span>CONTROL PRESET</span><select id="controlSchemeSelect"><option value="mouse">Mouse / Number Keys</option><option value="classic">Keyboard Aim / J-K-L</option></select></label>
       <div class="menu-stats">
-            <div><strong id="bestScore">000000</strong><span id="bestScoreLabel">TOWER BEST</span></div>
-            <div><strong>11</strong><span>TOWER FLOORS</span></div>
+            <div><strong id="bestScore">000000</strong><span id="bestScoreLabel">SPACE BEST</span></div>
+            <div><strong>11</strong><span>SPACE SECTORS</span></div>
             <div><strong id="bestClearTime">--:--.--</strong><span>BEST CLEAR</span></div>
           </div>
           <button id="settingsButton" class="text-button" type="button">SETTINGS</button>
@@ -82,10 +82,10 @@
       <p class="dialog-subtitle">Choose your operation. Weapons are acquired in the field.</p>
       <div class="choice-label">OPERATION</div>
       <div class="choice-grid mode-grid">
-        <button class="choice-card selected" data-mode="tower" type="button"><span class="choice-icon">01</span><strong>TOWER BREACH</strong><small>Clear all eleven floors.</small><em>CAMPAIGN // FIXED OBJECTIVE</em></button>
+        <button class="choice-card selected" data-mode="tower" type="button"><span class="choice-icon">01</span><strong>SPACE CAMPAIGN</strong><small>Clear all eleven hostile sectors.</small><em>CAMPAIGN // FIXED OBJECTIVE</em></button>
         <button class="choice-card" data-mode="survival" type="button"><span class="choice-icon">∞</span><strong>ENDLESS SURVIVAL</strong><small>Hold out against escalating waves.</small><em>ENDLESS // HIGH SCORE</em></button>
       </div>
-      <label class="setting-row hidden" id="towerDifficultyRow"><span><strong>TOWER THREAT LEVEL</strong><small>Choose enemy speed, strength, and numbers</small></span><select id="towerDifficultySelect"><option value="easy">EASY</option><option value="normal">NORMAL</option><option value="hard">HARD</option></select></label>
+      <label class="setting-row hidden" id="towerDifficultyRow"><span><strong>SECTOR THREAT LEVEL</strong><small>Choose enemy speed, strength, and numbers</small></span><select id="towerDifficultySelect"><option value="easy">EASY</option><option value="normal">NORMAL</option><option value="hard">HARD</option></select></label>
       <div id="survivalBrief" class="survival-brief hidden"><span>ENDLESS SURVIVAL</span><strong>Start easy. Survive longer as the waves grow harder.</strong></div>
       <div id="settingsRows" class="hidden"><label class="setting-row"><span><strong>SOUND</strong><small>Combat and menu sound effects</small></span><input id="soundToggle" type="checkbox" checked></label><label class="setting-row"><span><strong>SCREEN SHAKE</strong><small>Impact camera feedback</small></span><input id="shakeToggle" type="checkbox" checked></label></div>
       <div id="operatorCustomize" class="operator-customize hidden">
@@ -112,8 +112,8 @@
         <label>GUN COLOR<input id="operatorGunColor" type="color" value="#7ee5ff" aria-label="Choose gun color"></label>
         <label>VISUAL MARK<select id="operatorAccessory"><option value="none">NONE</option><option value="visor">VISOR</option><option value="crown">CROWN</option><option value="bandana">BANDANA</option></select></label>
       </div>
-      <section class="mission-leaderboard"><div class="mission-leaderboard-heading">LOCAL LEADERBOARD <span id="missionLeaderboardTitle">TOWER NORMAL THREAT</span></div><div id="missionLeaderboardList" class="leaderboard-entries"></div></section>
-      <div class="dialog-footer"><span id="loadoutSummary">TOWER BREACH / WEAPONS IN FIELD</span><button id="confirmDeploy" class="action-button action-primary" type="button">INITIATE DEPLOYMENT →</button></div>
+      <section class="mission-leaderboard"><div class="mission-leaderboard-heading">LOCAL LEADERBOARD <span id="missionLeaderboardTitle">SPACE CAMPAIGN NORMAL THREAT</span></div><div id="missionLeaderboardList" class="leaderboard-entries"></div></section>
+      <div class="dialog-footer"><span id="loadoutSummary">SPACE CAMPAIGN / WEAPONS IN FIELD</span><button id="confirmDeploy" class="action-button action-primary" type="button">INITIATE DEPLOYMENT →</button></div>
     </section>
 
     <section id="helpPanel" class="dialog-panel narrow-panel hidden" aria-labelledby="helpTitle">
@@ -126,11 +126,11 @@
     </section>
 
     <section id="pausePanel" class="overlay-panel hidden" aria-labelledby="pauseTitle">
-      <div class="overlay-card"><p class="eyebrow">COMBAT SUSPENDED</p><h2 id="pauseTitle">PAUSED</h2><p>Catch your breath. The tower is still waiting.</p><button id="resumeButton" class="action-button action-primary full-width" type="button">RESUME MISSION</button><button id="restartButton" class="action-button action-secondary full-width" type="button">RESTART RUN</button><button id="returnMenuButton" class="text-button" type="button">ABORT TO MAIN MENU</button></div>
+      <div class="overlay-card"><p class="eyebrow">COMBAT SUSPENDED</p><h2 id="pauseTitle">PAUSED</h2><p>Catch your breath. The hostile sector is still waiting.</p><button id="resumeButton" class="action-button action-primary full-width" type="button">RESUME MISSION</button><button id="restartButton" class="action-button action-secondary full-width" type="button">RESTART RUN</button><button id="returnMenuButton" class="text-button" type="button">ABORT TO MAIN MENU</button></div>
     </section>
 
     <section id="resultPanel" class="overlay-panel hidden" aria-labelledby="resultTitle">
-      <div class="result-layout"><div class="overlay-card"><p id="resultEyebrow" class="eyebrow">MISSION REPORT</p><h2 id="resultTitle">RUN ENDED</h2><p id="resultMessage">The tower won this round.</p><p id="resultMode" class="result-record">TOWER RUN</p><div class="result-stats"><div><strong id="resultScore">0</strong><span>SCORE</span></div><div><strong id="resultFloor">1</strong><span>HIGHEST FLOOR</span></div><div><strong id="resultTime">00:00.00</strong><span>TIME</span></div><div><strong id="resultBestScore">000000</strong><span>MODE BEST</span></div><div><strong id="resultEnemies">0</strong><span>HOSTILES DOWN</span></div><div><strong id="resultRockets">0</strong><span>ROCKETS USED</span></div></div><p id="resultRecord" class="result-record"></p><button id="retryButton" class="action-button action-primary full-width" type="button">RETRY RUN</button><button id="resultMenuButton" class="action-button action-secondary full-width" type="button">MAIN MENU</button></div><aside class="result-leaderboard"><p class="eyebrow">LOCAL FLIGHT RECORD</p><h3 id="resultLeaderboardTitle">TOWER NORMAL THREAT</h3><p class="leaderboard-help">Top operators for this mission.</p><div id="resultLeaderboardList" class="leaderboard-entries"></div></aside></div>
+      <div class="result-layout"><div class="overlay-card"><p id="resultEyebrow" class="eyebrow">MISSION REPORT</p><h2 id="resultTitle">RUN ENDED</h2><p id="resultMessage">The hostile sector won this round.</p><p id="resultMode" class="result-record">SPACE CAMPAIGN RUN</p><div class="result-stats"><div><strong id="resultScore">0</strong><span>SCORE</span></div><div><strong id="resultFloor">1</strong><span>HIGHEST SECTOR</span></div><div><strong id="resultTime">00:00.00</strong><span>TIME</span></div><div><strong id="resultBestScore">000000</strong><span>MODE BEST</span></div><div><strong id="resultEnemies">0</strong><span>HOSTILES DOWN</span></div><div><strong id="resultRockets">0</strong><span>ROCKETS USED</span></div></div><p id="resultRecord" class="result-record"></p><button id="retryButton" class="action-button action-primary full-width" type="button">RETRY RUN</button><button id="resultMenuButton" class="action-button action-secondary full-width" type="button">MAIN MENU</button></div><aside class="result-leaderboard"><p class="eyebrow">LOCAL FLIGHT RECORD</p><h3 id="resultLeaderboardTitle">SPACE CAMPAIGN NORMAL THREAT</h3><p class="leaderboard-help">Top operators for this mission.</p><div id="resultLeaderboardList" class="leaderboard-entries"></div></aside></div>
     </section>
 
     <section id="tutorialFinishConfirm" class="overlay-panel hidden" aria-labelledby="tutorialFinishTitle">
@@ -146,8 +146,8 @@
     <section id="floorClearPanel" class="overlay-panel floor-clear-panel hidden" aria-live="assertive" aria-labelledby="floorClearTitle">
       <div class="overlay-card">
         <p id="floorClearEyebrow" class="eyebrow">HOSTILE SECTOR SECURED</p>
-        <h2 id="floorClearTitle">FLOOR CLEARED</h2>
-        <p id="floorClearDetail">PREPARING NEXT FLOOR...</p>
+        <h2 id="floorClearTitle">SECTOR CLEARED</h2>
+        <p id="floorClearDetail">PREPARING NEXT SECTOR...</p>
       </div>
     </section>
 
@@ -157,7 +157,7 @@
       <p id="dailyChallengeText" class="tip-box"></p>
       <div id="achievementList" class="help-list"></div>
       <div id="masteryList" class="help-list"></div>
-      <div class="mission-leaderboard"><div class="mission-leaderboard-heading">LOCAL RECORDS <span id="recordsLeaderboardTitle">TOWER NORMAL THREAT</span></div><div id="leaderboardList" class="leaderboard-entries"></div></div>
+      <div class="mission-leaderboard"><div class="mission-leaderboard-heading">LOCAL RECORDS <span id="recordsLeaderboardTitle">SPACE CAMPAIGN NORMAL THREAT</span></div><div id="leaderboardList" class="leaderboard-entries"></div></div>
     </section>
 
   </main>

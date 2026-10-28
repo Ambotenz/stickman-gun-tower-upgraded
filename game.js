@@ -36,7 +36,6 @@ const weaponStats = {
   rifle: { label: "Assault Rifle", cooldown: 0.18, damage: 25, speed: 540, radius: 5, spread: 0.025, recoil: 2, impact: "spark" },
   smg: { label: "Rapid SMG", cooldown: 0.07, damage: 11, speed: 600, radius: 3, spread: 0.12, recoil: 1, impact: "spark" },
   heavy: { label: "Heavy Cannon", cooldown: 0.55, damage: 100, speed: 400, radius: 9, spread: 0.012, recoil: 7, impact: "burst" },
-  scatter: { label: "Scatter Blaster", cooldown: 0.72, damage: 18, speed: 470, radius: 4, spread: 0.3, recoil: 5, impact: "burst", pellets: 5 },
   burst: { label: "Burst Rifle", cooldown: 0.48, damage: 18, speed: 590, radius: 4, spread: 0.045, recoil: 2, impact: "spark", pellets: 3 },
 };
 function normalizeOperatorColor(color) { return /^#[0-9a-f]{6}$/i.test(color || "") ? color : "#dff7ff"; }
@@ -57,7 +56,7 @@ const floorConfigs = {
   3: { title: "ARMORED HOSTILES", mix: ["armored", "armored", "runner"], detail: "armor" },
   4: { title: "RANGED PRESSURE", mix: ["gunner", "gunner", "runner", "grunt"], detail: "ranged" },
   5: { title: "MIXED ASSAULT", mix: ["armored", "gunner", "exploder", "runner"], detail: "assault" },
-  6: { title: "WARDEN  ▸  MID-TOWER BOSS", mix: ["boss"], detail: "boss" },
+  6: { title: "WARDEN  ▸  MID-SECTOR BOSS", mix: ["boss"], detail: "boss" },
   7: { title: "HOSTILE REINFORCEMENTS", mix: ["armored", "gunner", "runner"], detail: "reinforcements" },
   8: { title: "EXPLOSIVE CROSS-FIRE", mix: ["gunner", "exploder", "armored", "runner"], detail: "crossfire" },
   9: { title: "ARMORED GAUNTLET", mix: ["armored", "gunner", "armored", "exploder"], detail: "gauntlet" },
@@ -126,6 +125,7 @@ const state = {
   shakeBiasY: 0,
   floor: 1,
   enemies: [],
+  stones: [],
   bullets: [],
   enemyBullets: [],
   particles: [],
@@ -136,7 +136,7 @@ const state = {
   levelCleared: false,
   score: 0,
   runTime: 0,
-  weaponAmmo: { rifle: 0, smg: 0, heavy: 0, scatter: 0, burst: 0 },
+  weaponAmmo: { rifle: 0, smg: 0, heavy: 0, burst: 0 },
   rocketPickup: null,
   rocketSpawnTimer: 0,
   healPickup: null,
@@ -217,6 +217,24 @@ const player = {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+function pushOutOfFloatingStones(actor, actorRadius, bounce = 0) {
+  for (const stone of state.stones) {
+    const dx = actor.x - stone.x;
+    const dy = actor.y - stone.y;
+    const distance = Math.hypot(dx, dy) || 0.001;
+    const minimumDistance = stone.radius + actorRadius;
+    if (distance >= minimumDistance) continue;
+    const nx = dx / distance;
+    const ny = dy / distance;
+    actor.x = stone.x + nx * minimumDistance;
+    actor.y = stone.y + ny * minimumDistance;
+    const inwardVelocity = actor.vx * nx + actor.vy * ny;
+    if (inwardVelocity < 0) {
+      actor.vx -= nx * inwardVelocity * (1 + bounce);
+      actor.vy -= ny * inwardVelocity * (1 + bounce);
+    }
+  }
 }
 function damageEnemy(enemy, damage, x, y, particleColor = "#9ae6ff", weaponType = "pistol") {
   const mitigated = enemy.shielded ? damage * 0.35 : enemy.type === "armored" ? damage * 0.55 : damage;
@@ -335,14 +353,17 @@ const achievementDefinitions = [
   { id: "boss-breaker", title: "BOSS BREAKER", requirement: "Defeat a Warden.", target: 1 },
   { id: "arsenal", title: "ARSENAL", requirement: "Get a kill with each firearm.", target: 4 },
   { id: "survivor", title: "SURVIVOR", requirement: "Survive for five minutes.", target: 300 },
-  { id: "speedrunner", title: "SPEEDRUNNER", requirement: "Clear the tower in under five minutes.", target: 1 },
-  { id: "perfect-run", title: "PERFECT RUN", requirement: "Clear the tower without taking damage.", target: 1 },
+  { id: "speedrunner", title: "SPEEDRUNNER", requirement: "Clear the space campaign in under five minutes.", target: 1 },
+  { id: "perfect-run", title: "PERFECT RUN", requirement: "Clear the space campaign without taking damage.", target: 1 },
 ];
 function savedProgress(key, fallback = {}) {
   try { return JSON.parse(storageGet(key, JSON.stringify(fallback))) || fallback; } catch (_) { return fallback; }
 }
 function getLeaderboardThreat(mode = state.mode) {
   return mode === "tower" ? settings.difficulty : mode === "survival" ? state.screen === "menu" ? "EASY" : getSurvivalThreatLabel() : "normal";
+}
+function getModeDisplayName(mode = state.mode) {
+  return mode === "tower" ? "SPACE CAMPAIGN" : mode === "survival" ? "ENDLESS SURVIVAL" : "TRAINING SIMULATION";
 }
 function leaderboardStorageKey(mode, threat) {
   const threatKey = String(threat).toLowerCase().replace(/\+/g, " plus ").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -359,7 +380,7 @@ function saveLeaderboardEntry(mode, threat, score, duration, cleared = false) {
   const rank = ranked.findIndex(item => item === entry);
   return rank < 0 ? null : rank + 1;
 }
-function renderLeaderboard(nodeId = "leaderboardList", mode = state.mode, threat = getLeaderboardThreat(mode), limit = 11) {
+function renderLeaderboard(nodeId = "leaderboardList", mode = state.mode, threat = getLeaderboardThreat(mode), limit = 5) {
   const node = document.getElementById(nodeId);
   if (!node) return;
   const board = savedProgress(leaderboardStorageKey(mode, threat), []);
@@ -373,6 +394,9 @@ function renderLeaderboard(nodeId = "leaderboardList", mode = state.mode, threat
   }
   board.slice(0, limit).forEach((entry, index) => {
     const row = document.createElement("p");
+    if (index === 0) row.classList.add("leaderboard-row-gold");
+    if (index === 1) row.classList.add("leaderboard-row-silver");
+    if (index === 2) row.classList.add("leaderboard-row-bronze");
     if (entry.cleared) row.classList.add("leaderboard-cleared");
     const rank = document.createElement("span");
     rank.className = "leaderboard-rank";
@@ -384,6 +408,10 @@ function renderLeaderboard(nodeId = "leaderboardList", mode = state.mode, threat
     name.className = "leaderboard-name";
     name.classList.add(index < 3 ? ["rank-gold", "rank-silver", "rank-bronze"][index] : "rank-gray");
     name.textContent = entry.name;
+    const currentCallsign = String(operatorStyle.name || "").trim().toLocaleUpperCase();
+    if (index < 5 && String(entry.name || "").trim().toLocaleUpperCase() === currentCallsign) {
+      name.classList.add("rank-current-operator");
+    }
     const stats = document.createElement("span");
     stats.className = "leaderboard-stats";
     stats.textContent = `${entry.score.toLocaleString()} pts  ▸  ${formatTime(entry.duration)}`;
@@ -459,7 +487,7 @@ function renderRecords() {
     return `<p>${weaponStats[weapon].label}: ${kills}/${goals[weapon]} kills  ▸  ${rank}</p>`;
   }).join("")}`;
   const recordsBoardTitle = document.getElementById("recordsLeaderboardTitle");
-  if (recordsBoardTitle) recordsBoardTitle.textContent = `${state.mode.toUpperCase()} // ${getLeaderboardThreat().toUpperCase()} THREAT`;
+  if (recordsBoardTitle) recordsBoardTitle.textContent = `${getModeDisplayName()} // ${getLeaderboardThreat().toUpperCase()} THREAT`;
   renderLeaderboard();
 }
 
@@ -620,7 +648,7 @@ function showMainMenu() {
   document.getElementById("towerDifficultyRow").classList.add("hidden");
   const scoreKey = state.mode === "survival" ? "sgtSurvivalBestScore" : "sgtTowerBestScore";
   document.getElementById("bestScore").textContent = String(Number(storageGet(scoreKey, "0")) || 0).padStart(6, "0");
-  document.getElementById("bestScoreLabel").textContent = state.mode === "survival" ? "SURVIVAL BEST" : "TOWER BEST";
+  document.getElementById("bestScoreLabel").textContent = state.mode === "survival" ? "SURVIVAL BEST" : "SPACE BEST";
   updateLoadoutSummary();
 }
 
@@ -639,7 +667,7 @@ function startMission() {
   updateControlHints();
   setStatus(state.mode === "survival" ? "Survival started. Stay alive as long as you can!"
     : state.mode === "tutorial" ? "Training simulation active. Follow the lesson prompts."
-      : "Tower run started. Clear the floor!");
+      : "Space campaign started. Clear the sector!");
   playTone(240, 0.12, "sawtooth", 0.035);
 }
 
@@ -652,9 +680,9 @@ function showResult(victory = false) {
   state.screen = "result";
   resultPanel.classList.remove("hidden");
   pausePanel.classList.add("hidden");
-  document.getElementById("resultEyebrow").textContent = victory ? "TOWER CONQUERED" : "MISSION REPORT";
-  document.getElementById("resultTitle").textContent = victory ? "TOWER CLEARED" : "RUN ENDED";
-  document.getElementById("resultMessage").textContent = victory && state.mode === "tower" ? "CONGRATULATIONS FOR CLEARING THE GAME" : victory ? "Every floor is clear. Operator, excellent work." : "The tower won this round. Re-arm and try again.";
+  document.getElementById("resultEyebrow").textContent = victory ? "SECTOR CONQUERED" : "MISSION REPORT";
+  document.getElementById("resultTitle").textContent = victory ? "SPACE CAMPAIGN CLEARED" : "RUN ENDED";
+  document.getElementById("resultMessage").textContent = victory && state.mode === "tower" ? "CONGRATULATIONS FOR CLEARING THE CAMPAIGN" : victory ? "Every sector is clear. Operator, excellent work." : "The hostile sector won this round. Re-arm and try again.";
   document.getElementById("resultScore").textContent = String(state.score).padStart(6, "0");
   document.getElementById("resultFloor").textContent = String(state.floor);
   document.getElementById("resultTime").textContent = formatTime(state.runTime);
@@ -662,7 +690,7 @@ function showResult(victory = false) {
   const previousBest = Number(storageGet(recordKey, "0")) || 0;
   const leaderboardThreat = getLeaderboardThreat(state.mode);
   const leaderboardRank = saveLeaderboardEntry(state.mode, leaderboardThreat, state.score, state.runTime, victory && state.mode === "tower");
-  document.getElementById("resultLeaderboardTitle").textContent = `${state.mode.toUpperCase()} ${leaderboardThreat.toUpperCase()} THREAT`;
+  document.getElementById("resultLeaderboardTitle").textContent = `${getModeDisplayName()} ${leaderboardThreat.toUpperCase()} THREAT`;
   renderLeaderboard("resultLeaderboardList", state.mode, leaderboardThreat);
   const best = Math.max(previousBest, state.score);
   const newRecord = state.score > previousBest;
@@ -673,10 +701,10 @@ function showResult(victory = false) {
   document.getElementById("resultRockets").textContent = String(state.rocketsUsed);
   document.getElementById("resultRecord").textContent = leaderboardRank
     ? `${operatorStyle.name}  ▸  LOCAL RANK #${leaderboardRank}`
-    : newRecord ? "NEW PERSONAL RECORD" : "SCORE OUTSIDE LOCAL TOP 10";
+    : newRecord ? "NEW PERSONAL RECORD" : "SCORE OUTSIDE LOCAL TOP 5";
   document.getElementById("resultMode").textContent = state.mode === "tower"
-    ? `${settings.difficulty.toUpperCase()} TOWER RUN`
-    : state.mode === "survival" ? `${getSurvivalThreatLabel()} SURVIVAL  ▸  FLOOR ${state.floor}` : "TRAINING SIM";
+    ? `${settings.difficulty.toUpperCase()} SPACE CAMPAIGN`
+    : state.mode === "survival" ? `${getSurvivalThreatLabel()} SURVIVAL  ▸  WAVE ${state.floor}` : "TRAINING SIM";
   document.getElementById("bestScore").textContent = String(best).padStart(6, "0");
 
   if (victory && state.mode === "tower") {
@@ -691,7 +719,7 @@ function showResult(victory = false) {
 }
 
 function updateHud() {
-  floorLabel.textContent = `Floor ${state.floor}`;
+  floorLabel.textContent = `Sector ${state.floor}`;
   missionLabel.textContent = state.paused
     ? "Mission: paused"
     : state.gameOver
@@ -699,7 +727,7 @@ function updateHud() {
       : state.levelCleared
         ? "Mission: advance"
         : state.mode === "survival" ? "Mission: survive"
-          : state.mode === "tutorial" ? "Mission: training simulation" : "Mission: clear the floor";
+        : state.mode === "tutorial" ? "Mission: training simulation" : "Mission: clear the sector";
   pauseButton.textContent = state.paused ? "Resume" : "Pause";
   pauseButton.setAttribute("aria-pressed", String(state.paused));
   pauseButton.disabled = state.gameOver;
@@ -904,7 +932,7 @@ function spawnHealPickup() {
 }
 
 function spawnWeaponPickup() {
-  const weapons = ["rifle", "smg", "heavy", "scatter", "burst"];
+  const weapons = ["rifle", "smg", "heavy", "burst"];
   const weapon = weapons[Math.floor(Math.random() * weapons.length)];
   state.weaponPickup = {
     x: rand(220, WIDTH - 220),
@@ -961,12 +989,12 @@ function updateHealPickup(dt) {
 function showFloorNotification(kind, duration) {
   const panel = document.getElementById("floorClearPanel");
   const starting = kind === "starting";
-  const noun = state.mode === "survival" ? "WAVE" : "FLOOR";
+  const noun = state.mode === "survival" ? "WAVE" : "SECTOR";
   panel.classList.remove("floor-starting", "floor-ending");
   const finalFloorIntro = starting && state.mode === "tower" && state.floor === 11;
   document.getElementById("floorClearEyebrow").textContent = finalFloorIntro ? "FINAL CHALLENGE" : starting ? "HOSTILE SECTOR INCOMING" : "HOSTILE SECTOR SECURED";
   document.getElementById("floorClearTitle").textContent = finalFloorIntro
-    ? "FINAL FLOOR GOODLUCK!!"
+    ? "FINAL SECTOR GOODLUCK!!"
     : starting
       ? `${noun} ${state.floor} STARTING`
     : `${noun} ${state.floor} CLEARED`;
@@ -974,7 +1002,7 @@ function showFloorNotification(kind, duration) {
     ? "THE WARDEN AWAITS"
     : starting
       ? "NEW SECTOR DETECTED: PREPARE TO DEPLOY"
-    : state.mode === "tower" ? "PREPARING NEXT FLOOR..." : "PREPARING NEXT WAVE...";
+    : state.mode === "tower" ? "PREPARING NEXT SECTOR..." : "PREPARING NEXT WAVE...";
   panel.classList.add(starting ? "floor-starting" : "floor-ending");
   panel.classList.remove("hidden");
   void panel.offsetWidth;
@@ -983,6 +1011,7 @@ function showFloorNotification(kind, duration) {
 
 function buildLevel() {
   state.enemies = [];
+  state.stones = [];
   state.bullets = [];
   state.enemyBullets = [];
   state.particles = [];
@@ -1033,6 +1062,24 @@ function buildLevel() {
     enemy.y = 145 + lane * 135 + rand(-25, 25);
     state.enemies.push(enemy);
   }
+  if (state.mode !== "tutorial") {
+    const stoneCount = state.mode === "survival" ? 5
+      : state.floor <= 4 ? 0
+        : state.floor <= 6 ? 2
+          : state.floor <= 8 ? 3
+            : state.floor <= 10 ? 4 : 5;
+    const stoneSpots = [
+      [310, 205], [455, 465], [595, 285], [735, 500], [850, 165],
+      [390, 340], [680, 390], [520, 145], [820, 365], [275, 515],
+    ];
+    const shuffledSpots = stoneSpots.sort(() => Math.random() - 0.5);
+    for (const [x, y] of shuffledSpots) {
+      if (state.stones.length >= stoneCount) break;
+      if (Math.hypot(player.x - x, player.y - y) < 115) continue;
+      if (state.enemies.some(enemy => Math.hypot(enemy.x - x, enemy.y - y) < 78)) continue;
+      state.stones.push({ x, y, radius: rand(22, 34), phase: rand(0, Math.PI * 2), facets: 7 + Math.floor(Math.random() * 3) });
+    }
+  }
   spawnRocketPickup();
   spawnWeaponPickup();
   state.weaponSpawnTimer = rand(5, 9);
@@ -1047,7 +1094,7 @@ function buildLevel() {
     for (const enemy of state.enemies) if (!enemy.isBoss && Math.random() < 0.22) enemy.shielded = true;
   }
   setStatus(state.mode === "tutorial" ? "TRAINING SIMULATION  ▸  ENCOUNTERS ON DEMAND"
-    : state.mode === "tower" ? `FLOOR ${state.floor}  ▸  ${config.title}  ▸  ${state.arenaModifier.title}`
+    : state.mode === "tower" ? `SECTOR ${state.floor}  ▸  ${config.title}  ▸  ${state.arenaModifier.title}`
       : `WAVE ${state.wave}  ▸  ${getSurvivalThreatLabel()} THREAT  ▸  ${state.arenaModifier.title}`);
   if (state.mode !== "tutorial") showFloorNotification("starting", 2);
 }
@@ -1141,7 +1188,6 @@ function resetRun() {
   state.weaponAmmo.rifle = 0;
   state.weaponAmmo.smg = 0;
   state.weaponAmmo.heavy = 0;
-  state.weaponAmmo.scatter = 0;
   state.weaponAmmo.burst = 0;
   state.weapon = "pistol";
   state.floorStartingHp = player.maxHp;
@@ -1178,7 +1224,7 @@ function hitPlayer(amount) {
 
 function findLoadedWeapon(preferredWeapon = state.weapon) {
   if (preferredWeapon !== "pistol" && state.weaponAmmo[preferredWeapon] > 0) return preferredWeapon;
-  return ["rifle", "smg", "heavy", "scatter", "burst"].find(weapon => state.weaponAmmo[weapon] > 0) || "pistol";
+  return ["rifle", "smg", "heavy", "burst"].find(weapon => state.weaponAmmo[weapon] > 0) || "pistol";
 }
 
 function shootPlayer(useRocket = false, selectedWeapon = state.weapon) {
@@ -1226,7 +1272,7 @@ function shootPlayer(useRocket = false, selectedWeapon = state.weapon) {
   player.fireCooldown = weapon.cooldown / arenaFireRate;
   const spread = weapon.spread;
   const shotAngles = weapon.pellets
-    ? Array.from({ length: weapon.pellets }, (_, i) => (i - (weapon.pellets - 1) / 2) * (weaponType === "scatter" ? 0.14 : 0.035))
+    ? Array.from({ length: weapon.pellets }, (_, i) => (i - (weapon.pellets - 1) / 2) * 0.035)
     : [0];
   for (const offset of shotAngles) {
     const angle = player.angle + rand(-spread, spread) + offset;
@@ -1357,7 +1403,7 @@ function nextFloor() {
   document.getElementById("floorClearPanel").classList.add("hidden");
   if (state.floor > 11) {
     if (state.mode === "survival") { /* Survival mode keeps climbing indefinitely. */ }
-    else { state.floor = 11; state.gameOver = true; showResult(true); setStatus("Tower cleared! Mission complete."); return; }
+    else { state.floor = 11; state.gameOver = true; showResult(true); setStatus("Space campaign cleared! Mission complete."); return; }
   }
   updateDailyChallenge("floor", state.floor);
   state.floorStartingHp = player.hp;
@@ -1548,7 +1594,7 @@ function updatePlayer(dt) {
 
   if (state.weaponPickup && Math.hypot(player.x - state.weaponPickup.x, player.y - state.weaponPickup.y) < 34) {
     const pickedUpWeapon = state.weaponPickup.weapon;
-    const ammoGranted = pickedUpWeapon === "rifle" ? 15 : pickedUpWeapon === "smg" ? 30 : pickedUpWeapon === "scatter" ? 5 : pickedUpWeapon === "burst" ? 8 : 3;
+    const ammoGranted = pickedUpWeapon === "rifle" ? 15 : pickedUpWeapon === "smg" ? 30 : pickedUpWeapon === "burst" ? 8 : 3;
     state.weaponAmmo[pickedUpWeapon] += ammoGranted;
     state.weapon = pickedUpWeapon;
     setStatus(`${weaponStats[pickedUpWeapon].label} equipped! +${ammoGranted} shots.`);
@@ -1592,6 +1638,7 @@ function updatePlayer(dt) {
   player.recoilVy *= Math.exp(-8 * dt);
   player.x = clamp(player.x, 18, WIDTH - 18);
   player.y = clamp(player.y, 50, HEIGHT - 40);
+  pushOutOfFloatingStones(player, 14);
   if (player.y > HEIGHT - 100) state.aerialKills = 0;
 
   const moveX = (right ? 1 : 0) - (left ? 1 : 0);
@@ -1648,6 +1695,14 @@ function updateBullets(dt) {
       continue;
     }
 
+    const stoneHit = state.stones.find(stone => Math.hypot(bullet.x - stone.x, bullet.y - stone.y) < stone.radius + bullet.radius);
+    if (stoneHit) {
+      if (bullet.rocket) explodeRocket(bullet);
+      else spawnParticles(bullet.x, bullet.y, "#c3c8d1", 4);
+      state.bullets.splice(i, 1);
+      continue;
+    }
+
     let hitRocket = false;
     for (const enemy of state.enemies) {
       if (!enemy.alive) continue;
@@ -1682,6 +1737,12 @@ function updateBullets(dt) {
     bullet.y += bullet.vy * dt;
 
     if (bullet.x < -40 || bullet.x > WIDTH + 40 || bullet.y < -40 || bullet.y > HEIGHT + 40) {
+      state.enemyBullets.splice(i, 1);
+      continue;
+    }
+
+    if (state.stones.some(stone => Math.hypot(bullet.x - stone.x, bullet.y - stone.y) < stone.radius + bullet.radius)) {
+      spawnParticles(bullet.x, bullet.y, "#c3c8d1", 3);
       state.enemyBullets.splice(i, 1);
       continue;
     }
@@ -1822,6 +1883,7 @@ function updateEnemies(dt) {
 
     enemy.x = clamp(enemy.x, 30, WIDTH - 30);
     enemy.y = clamp(enemy.y, 20, HEIGHT - 40);
+    pushOutOfFloatingStones(enemy, enemy.isBoss ? 27 : Math.max(15, enemy.width * 0.72), 0.35);
     if (enemy.rushTimer > 0 && !enemy.rushHit && Math.hypot(player.x - enemy.x, player.y - enemy.y) < 48) {
       enemy.rushHit = true;
       hitPlayer((enemy.type === "grunt" ? 11 : 18) * getDifficultyStats().damage);
@@ -1844,15 +1906,19 @@ function updateEnemies(dt) {
       setStatus("TELEPORTER REPOSITIONED");
     }
     if (enemy.behavior === "medic" && enemy.abilityCooldown <= 0) {
-      const ally = state.enemies.find(other => other !== enemy && other.alive && Math.hypot(other.x - enemy.x, other.y - enemy.y) < 170 && other.hp < other.maxHp);
-      if (ally) {
-        ally.hp = Math.min(ally.maxHp, ally.hp + 1.2);
-        enemy.abilityCooldown = 2.4;
-        enemy.skillTimer = 0.65;
+      const nearbyAllies = state.enemies.filter(other => other !== enemy && other.alive
+        && other.hp < other.maxHp && Math.hypot(other.x - enemy.x, other.y - enemy.y) < 260);
+      if (nearbyAllies.length) {
+        for (const ally of nearbyAllies) {
+          ally.hp = Math.min(ally.maxHp, ally.hp + ally.maxHp * 0.2);
+          spawnParticles(ally.x, ally.y, "#78f0a0", 7);
+        }
+        const ally = nearbyAllies[0];
+        enemy.abilityCooldown = 3;
+        enemy.skillTimer = 0.85;
         enemy.skillKind = "heal";
         enemy.skillTargetX = ally.x;
         enemy.skillTargetY = ally.y;
-        spawnParticles(ally.x, ally.y, "#78f0a0", 5);
       }
     }
     enemy.fireCooldown -= dt * (state.surgeActive > 0 ? 1.8 : 1);
@@ -1906,7 +1972,7 @@ function updateEnemies(dt) {
     if (!state.floorTookDamage) unlockAchievement("untouchable");
     showFloorNotification("ending", 2);
     clearHeldInput();
-    setStatus(`Floor ${state.floor} cleared!`);
+    setStatus(`Sector ${state.floor} cleared!`);
   }
 }
 
@@ -2260,7 +2326,7 @@ function drawEnemy(enemy) {
     ctx.restore();
   }
   if (enemy.skillTimer > 0) {
-    const duration = enemy.skillKind === "summon" ? 0.9 : enemy.skillKind === "heal" || enemy.skillKind === "explode" ? 0.65 : enemy.skillKind === "teleport" || enemy.skillKind === "rush" ? 0.55 : enemy.skillKind === "charged" ? 0.38 : enemy.skillKind === "slam" ? 0.55 : 0.38;
+    const duration = enemy.skillKind === "summon" ? 0.9 : enemy.skillKind === "heal" ? 0.85 : enemy.skillKind === "explode" ? 0.65 : enemy.skillKind === "teleport" || enemy.skillKind === "rush" ? 0.55 : enemy.skillKind === "charged" ? 0.38 : enemy.skillKind === "slam" ? 0.55 : 0.38;
     const progress = 1 - enemy.skillTimer / duration;
     const skillColor = enemy.skillKind === "heal" ? "#78f0a0"
       : enemy.skillKind === "explode" ? "#ff7c3d"
@@ -2278,12 +2344,12 @@ function drawEnemy(enemy) {
       ctx.lineTo(enemy.skillTargetX - enemy.x, enemy.skillTargetY - enemy.y);
       ctx.stroke();
     }
-    const ringCount = enemy.skillKind === "summon" ? 3 : 1;
+    const ringCount = enemy.skillKind === "summon" || enemy.skillKind === "heal" ? 3 : 1;
     for (let i = 0; i < ringCount; i += 1) {
       const ringProgress = (progress + i / ringCount) % 1;
       ctx.globalAlpha = Math.max(0, 1 - ringProgress) * 0.8;
       ctx.beginPath();
-      const maxRadius = enemy.skillKind === "summon" ? 88 : enemy.skillKind === "explode" ? 105 : enemy.skillKind === "slam" ? 132 : 46;
+      const maxRadius = enemy.skillKind === "heal" ? 260 : enemy.skillKind === "summon" ? 88 : enemy.skillKind === "explode" ? 105 : enemy.skillKind === "slam" ? 132 : 46;
       ctx.arc(0, 0, 14 + ringProgress * maxRadius, 0, Math.PI * 2);
       ctx.stroke();
     }
@@ -2682,24 +2748,31 @@ function drawHudBars() {
 
   ctx.fillStyle = "rgba(255, 213, 133, 0.72)";
   ctx.font = "600 9px Orbitron, Segoe UI, sans-serif";
-  ctx.fillText("ROCKET", panelX + 303, panelY + 25);
+  ctx.fillText("ROCKET", panelX + 290, panelY + 25);
   ctx.fillStyle = "#ffe2a5";
   ctx.font = "700 18px Orbitron, Segoe UI, sans-serif";
-  ctx.fillText(String(player.rocketCount), panelX + 303, panelY + 51);
+  ctx.fillText(String(player.rocketCount), panelX + 290, panelY + 51);
 
   ctx.fillStyle = "rgba(141, 231, 255, 0.78)";
   ctx.font = "600 9px Orbitron, Segoe UI, sans-serif";
-  ctx.fillText("SMG", panelX + 363, panelY + 25);
+  ctx.fillText("SMG", panelX + 334, panelY + 25);
   ctx.fillStyle = "#b8f2ff";
   ctx.font = "700 18px Orbitron, Segoe UI, sans-serif";
-  ctx.fillText(String(state.weaponAmmo.smg), panelX + 363, panelY + 51);
+  ctx.fillText(String(state.weaponAmmo.smg), panelX + 334, panelY + 51);
 
   ctx.fillStyle = "rgba(255, 179, 138, 0.82)";
   ctx.font = "600 9px Orbitron, Segoe UI, sans-serif";
-  ctx.fillText("HEAVY", panelX + 416, panelY + 25);
+  ctx.fillText("HEAVY", panelX + 378, panelY + 25);
   ctx.fillStyle = "#ffd0b8";
   ctx.font = "700 18px Orbitron, Segoe UI, sans-serif";
-  ctx.fillText(String(state.weaponAmmo.heavy), panelX + 416, panelY + 51);
+  ctx.fillText(String(state.weaponAmmo.heavy), panelX + 378, panelY + 51);
+
+  ctx.fillStyle = "rgba(196, 166, 255, 0.82)";
+  ctx.font = "600 9px Orbitron, Segoe UI, sans-serif";
+  ctx.fillText("BURST", panelX + 422, panelY + 25);
+  ctx.fillStyle = "#dfcaff";
+  ctx.font = "700 18px Orbitron, Segoe UI, sans-serif";
+  ctx.fillText(String(state.weaponAmmo.burst), panelX + 422, panelY + 51);
 
   const scoreBoxX = WIDTH - 244;
   const scoreBoxY = panelY;
@@ -2803,6 +2876,43 @@ function drawArenaBackground() {
   background.addColorStop(1, "#090b10");
   ctx.fillStyle = background;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
+}
+
+function drawFloatingStones() {
+  for (const stone of state.stones) {
+    const bob = Math.sin(state.time * 1.7 + stone.phase) * 5;
+    const rotation = Math.sin(state.time * 0.55 + stone.phase) * 0.08;
+    ctx.save();
+    ctx.translate(stone.x, stone.y + bob);
+    ctx.rotate(rotation);
+    ctx.shadowColor = "rgba(137, 169, 196, 0.38)";
+    ctx.shadowBlur = 15;
+    const rock = ctx.createLinearGradient(-stone.radius, -stone.radius, stone.radius, stone.radius);
+    rock.addColorStop(0, "#8997a5");
+    rock.addColorStop(0.48, "#4b5662");
+    rock.addColorStop(1, "#252d37");
+    ctx.fillStyle = rock;
+    ctx.strokeStyle = "rgba(190, 211, 226, 0.62)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < stone.facets; i += 1) {
+      const angle = (Math.PI * 2 * i) / stone.facets - Math.PI / 2;
+      const unevenRadius = stone.radius * (0.78 + 0.22 * Math.sin(i * 12.3 + stone.phase));
+      const x = Math.cos(angle) * unevenRadius;
+      const y = Math.sin(angle) * unevenRadius * 0.82;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = "#d8e5ee";
+    ctx.beginPath();
+    ctx.ellipse(-stone.radius * 0.22, -stone.radius * 0.22, stone.radius * 0.3, stone.radius * 0.12, -0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawArenaEffects() {
@@ -2914,6 +3024,7 @@ function drawWorld() {
   drawArenaBackground();
   drawArenaEffects();
   drawStars();
+  drawFloatingStones();
 
   for (const bullet of state.bullets) drawBullet(bullet);
   for (const bullet of state.enemyBullets) drawBullet(bullet);
@@ -2937,6 +3048,8 @@ function drawWorld() {
     playerLight.addColorStop(1, "rgba(255, 150, 120, 0)");
     ctx.fillStyle = playerLight;
     ctx.fillRect(player.x - 158, player.y - 158, 316, 316);
+    for (const bullet of state.bullets) drawBullet(bullet);
+    for (const bullet of state.enemyBullets) drawBullet(bullet);
     drawPlayer();
   }
   if (document.body.classList.contains("playing")) drawHudBars();
@@ -2991,17 +3104,17 @@ function updateLoadoutSummary() {
   loadoutPanel.classList.toggle("survival-mode", isSurvival);
   document.getElementById("survivalBrief").classList.toggle("hidden", !isSurvival || !document.getElementById("settingsRows").classList.contains("hidden"));
   const modeName = state.mode === "survival" ? "ENDLESS SURVIVAL"
-    : state.mode === "tutorial" ? "TRAINING SIMULATION" : "TOWER BREACH";
+    : state.mode === "tutorial" ? "TRAINING SIMULATION" : "SPACE CAMPAIGN";
   const difficulty = state.mode === "survival"
     ? " / STARTS EASY, ESCALATES EACH FLOOR"
     : state.mode === "tower" ? ` / ${settings.difficulty.toUpperCase()} THREAT` : "";
   document.getElementById("loadoutSummary").textContent = `${modeName}${difficulty}  ▸  WEAPONS IN FIELD`;
   const scoreKey = state.mode === "survival" ? "sgtSurvivalBestScore" : "sgtTowerBestScore";
   document.getElementById("bestScore").textContent = String(Number(storageGet(scoreKey, "0")) || 0).padStart(6, "0");
-  document.getElementById("bestScoreLabel").textContent = state.mode === "survival" ? "SURVIVAL BEST" : "TOWER BEST";
+  document.getElementById("bestScoreLabel").textContent = state.mode === "survival" ? "SURVIVAL BEST" : "SPACE BEST";
   const leaderboardThreat = getLeaderboardThreat(state.mode);
-  document.getElementById("missionLeaderboardTitle").textContent = `${state.mode.toUpperCase()} ${leaderboardThreat.toUpperCase()} THREAT`;
-  renderLeaderboard("missionLeaderboardList", state.mode, leaderboardThreat, 11);
+  document.getElementById("missionLeaderboardTitle").textContent = `${getModeDisplayName()} ${leaderboardThreat.toUpperCase()} THREAT`;
+  renderLeaderboard("missionLeaderboardList", state.mode, leaderboardThreat, 5);
 }
 
 document.getElementById("playButton").addEventListener("click", () => {

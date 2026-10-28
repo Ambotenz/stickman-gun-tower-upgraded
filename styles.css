@@ -733,6 +733,10 @@ canvas{background:linear-gradient(#0d080b,#1b0b10 56%,#080608)}
 .operator-customize{grid-template-columns:minmax(140px,.8fr) repeat(2,minmax(0,1fr));column-gap:18px;row-gap:14px}
 .operator-preview{grid-row:span 2}
 @media(max-width:800px){.operator-customize{grid-template-columns:1fr;gap:12px}.operator-preview{grid-row:auto}}
+.leaderboard-entries .leaderboard-row-gold{border:1px solid #ffd95b88;border-bottom-color:#ffd95b88;border-radius:4px;background:linear-gradient(100deg,#ffd95b20,#a8781708);box-shadow:inset 0 0 18px #ffd95b0c,0 0 13px #ffc92824}
+.leaderboard-entries .leaderboard-row-silver{border:1px solid #dce7f277;border-bottom-color:#dce7f277;border-radius:4px;background:linear-gradient(100deg,#dce7f218,#9fb4cc08);box-shadow:inset 0 0 18px #dce7f20a,0 0 12px #b9d4e91b}
+.leaderboard-entries .leaderboard-row-bronze{border:1px solid #d9946280;border-bottom-color:#d9946280;border-radius:4px;background:linear-gradient(100deg,#d994621c,#8e4b2a08);box-shadow:inset 0 0 18px #d994620c,0 0 12px #b8663d20}
+.leaderboard-name.rank-current-operator{color:#63caff;text-shadow:0 0 10px #38aaff99}
 .operator-customize select#operatorAccessory option{color:#111;background:#f5eeee}
 .survival-brief{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:14px 0 4px;padding:13px 16px;border:1px solid #a8323b88;border-left:3px solid #f04d53;border-radius:4px;background:linear-gradient(100deg,#58131c66,#15090ef2 70%);box-shadow:inset 0 1px #ffffff09,0 8px 22px #0004}
 .survival-brief span{flex:0 0 auto;color:#ff7778;font:800 10px Orbitron,"Segoe UI",sans-serif;letter-spacing:.14em}
