@@ -39,7 +39,8 @@ const weaponStats = {
   scatter: { label: "Scatter Blaster", cooldown: 0.72, damage: 18, speed: 470, radius: 4, spread: 0.3, recoil: 5, impact: "burst", pellets: 5 },
   burst: { label: "Burst Rifle", cooldown: 0.48, damage: 18, speed: 590, radius: 4, spread: 0.045, recoil: 2, impact: "spark", pellets: 3 },
 };
-const operatorStyle = { name: storageGet("sgtOperatorName", "OPERATOR 01"), accessory: storageGet("sgtOperatorAccessory", "none") };
+function normalizeOperatorColor(color) { return /^#[0-9a-f]{6}$/i.test(color || "") ? color : "#dff7ff"; }
+const operatorStyle = { name: storageGet("sgtOperatorName", "OPERATOR 01"), accessory: storageGet("sgtOperatorAccessory", "none"), color: normalizeOperatorColor(storageGet("sgtOperatorColor", "#dff7ff")), gunColor: normalizeOperatorColor(storageGet("sgtOperatorGunColor", "#7ee5ff")) };
 const arenaModifiers = [
   { id: "reactor", title: "REACTOR SURGE", detail: "Energy bursts sweep across the arena." },
   { id: "lowGravity", title: "LOW GRAVITY", detail: "Movement and enemy drift are amplified." },
@@ -2134,7 +2135,7 @@ function drawPlayer() {
   }
 
   ctx.rotate(bodyLean);
-  ctx.strokeStyle = player.hitFlash > 0 ? "#ffffff" : "#dff7ff";
+  ctx.strokeStyle = player.hitFlash > 0 ? "#ffffff" : operatorStyle.color;
   ctx.lineWidth = 4;
 
   ctx.beginPath();
@@ -2143,8 +2144,6 @@ function drawPlayer() {
   if (operatorStyle.accessory === "visor") { ctx.fillStyle = "#66f4ff"; ctx.fillRect(-9, -21, 18, 4); }
   if (operatorStyle.accessory === "crown") { ctx.beginPath(); ctx.moveTo(-8, -30); ctx.lineTo(-8, -36); ctx.lineTo(-3, -32); ctx.lineTo(0, -39); ctx.lineTo(3, -32); ctx.lineTo(8, -36); ctx.lineTo(8, -30); ctx.closePath(); ctx.fillStyle = "#ffd45d"; ctx.fill(); }
   if (operatorStyle.accessory === "bandana") { ctx.fillStyle = "#ff6464"; ctx.fillRect(-10, -28, 20, 5); ctx.fillRect(8, -27, 7, 3); }
-  ctx.save(); ctx.rotate(-player.angle); ctx.fillStyle = "#dff7ff"; ctx.font = "700 10px Orbitron, sans-serif"; ctx.textAlign = "center"; ctx.fillText(operatorStyle.name, 0, -43); ctx.restore();
-
   ctx.beginPath();
   ctx.moveTo(0, -6);
   ctx.lineTo(0, 18);
@@ -2164,12 +2163,21 @@ function drawPlayer() {
   ctx.rotate(player.angle - bodyLean);
   const masteryCount = getWeaponMastery()[state.weapon] || 0;
   const masteryGoal = { pistol: 100, rifle: 250, smg: 300, heavy: 75 }[state.weapon];
-  ctx.strokeStyle = masteryCount >= masteryGoal * 2 ? "#ff675c" : masteryCount >= masteryGoal ? "#ffb266" : "#7ee5ff";
+  const masteryColor = masteryCount >= masteryGoal * 2 ? "#ff675c" : masteryCount >= masteryGoal ? "#ffb266" : "#7ee5ff";
+  ctx.strokeStyle = operatorStyle.gunColor;
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(13, 0);
   ctx.lineTo(32 - player.recoil, 2);
   ctx.stroke();
+  if (masteryCount >= masteryGoal) {
+    ctx.strokeStyle = masteryColor;
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.moveTo(17, -1);
+    ctx.lineTo(27, -1);
+    ctx.stroke();
+  }
 
   if (player.gunFlash > 0) {
     ctx.strokeStyle = "#fff3a3";
@@ -2179,7 +2187,7 @@ function drawPlayer() {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "#dff7ff";
+  ctx.strokeStyle = player.hitFlash > 0 ? "#ffffff" : operatorStyle.color;
   ctx.lineWidth = 3.5;
   ctx.beginPath();
   ctx.moveTo(0, -3);
@@ -2192,13 +2200,21 @@ function drawPlayer() {
   ctx.lineTo(17, 3);
   ctx.stroke();
 
-  ctx.fillStyle = "#9beeff";
+  ctx.fillStyle = player.hitFlash > 0 ? "#ffffff" : operatorStyle.color;
   ctx.beginPath();
   ctx.arc(17, 0, 3, 0, Math.PI * 2);
   ctx.arc(17, 3, 3, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
+  ctx.restore();
+  ctx.save();
+  if (player.invuln > 0 && Math.floor(state.time * 18) % 2 === 0) ctx.globalAlpha = 0.4;
+  ctx.fillStyle = operatorStyle.color;
+  ctx.font = "700 10px Orbitron, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(operatorStyle.name, player.x, player.y + bob - 43);
   ctx.restore();
 }
 
@@ -2971,6 +2987,9 @@ document.getElementById("controlSchemeSelect").value = settings.controlScheme;
 updateControlHints();
 
 function updateLoadoutSummary() {
+  const isSurvival = state.mode === "survival";
+  loadoutPanel.classList.toggle("survival-mode", isSurvival);
+  document.getElementById("survivalBrief").classList.toggle("hidden", !isSurvival || !document.getElementById("settingsRows").classList.contains("hidden"));
   const modeName = state.mode === "survival" ? "ENDLESS SURVIVAL"
     : state.mode === "tutorial" ? "TRAINING SIMULATION" : "TOWER BREACH";
   const difficulty = state.mode === "survival"
@@ -2988,7 +3007,7 @@ function updateLoadoutSummary() {
 document.getElementById("playButton").addEventListener("click", () => {
   closeMenuPanels();
   document.getElementById("settingsRows").classList.add("hidden");
-  document.getElementById("operatorCustomize").classList.add("hidden");
+  document.getElementById("operatorCustomize").classList.remove("hidden");
   document.getElementById("towerDifficultyRow").classList.toggle("hidden", state.mode !== "tower");
   document.getElementById("confirmDeploy").classList.remove("hidden");
   loadoutPanel.classList.remove("hidden");
@@ -2997,7 +3016,8 @@ document.getElementById("playButton").addEventListener("click", () => {
 document.getElementById("settingsButton").addEventListener("click", () => {
   closeMenuPanels(); loadoutPanel.classList.remove("hidden");
   document.getElementById("settingsRows").classList.remove("hidden");
-  document.getElementById("operatorCustomize").classList.remove("hidden");
+  document.getElementById("operatorCustomize").classList.add("hidden");
+  document.getElementById("survivalBrief").classList.add("hidden");
   document.getElementById("towerDifficultyRow").classList.add("hidden");
   document.getElementById("confirmDeploy").classList.add("hidden");
 });
@@ -3104,10 +3124,26 @@ document.getElementById("soundToggle").checked = settings.sound;
 document.getElementById("shakeToggle").checked = settings.shake;
 const operatorNameInput = document.getElementById("operatorName");
 const operatorAccessoryInput = document.getElementById("operatorAccessory");
+const operatorColorInput = document.getElementById("operatorColor");
+const operatorGunColorInput = document.getElementById("operatorGunColor");
+const operatorPreview = document.getElementById("operatorPreview");
 operatorNameInput.value = operatorStyle.name;
 operatorAccessoryInput.value = ["none", "visor", "crown", "bandana"].includes(operatorStyle.accessory) ? operatorStyle.accessory : "none";
-operatorNameInput.addEventListener("input", () => { operatorStyle.name = operatorNameInput.value.trim().slice(0, 14) || "OPERATOR"; storageSet("sgtOperatorName", operatorStyle.name); });
-operatorAccessoryInput.addEventListener("change", () => { operatorStyle.accessory = operatorAccessoryInput.value; storageSet("sgtOperatorAccessory", operatorStyle.accessory); });
+operatorColorInput.value = operatorStyle.color;
+operatorGunColorInput.value = operatorStyle.gunColor;
+function updateOperatorPreview() {
+  operatorPreview.style.setProperty("--preview-suit", operatorStyle.color);
+  operatorPreview.style.setProperty("--preview-gun", operatorStyle.gunColor);
+  document.getElementById("operatorPreviewName").textContent = operatorStyle.name;
+  document.getElementById("previewVisor").classList.toggle("hidden", operatorStyle.accessory !== "visor");
+  document.getElementById("previewCrown").classList.toggle("hidden", operatorStyle.accessory !== "crown");
+  document.getElementById("previewBandana").classList.toggle("hidden", operatorStyle.accessory !== "bandana");
+}
+updateOperatorPreview();
+operatorNameInput.addEventListener("input", () => { operatorStyle.name = operatorNameInput.value.trim().slice(0, 14) || "OPERATOR"; storageSet("sgtOperatorName", operatorStyle.name); updateOperatorPreview(); });
+operatorAccessoryInput.addEventListener("change", () => { operatorStyle.accessory = operatorAccessoryInput.value; storageSet("sgtOperatorAccessory", operatorStyle.accessory); updateOperatorPreview(); });
+operatorColorInput.addEventListener("input", () => { operatorStyle.color = normalizeOperatorColor(operatorColorInput.value); storageSet("sgtOperatorColor", operatorStyle.color); updateOperatorPreview(); });
+operatorGunColorInput.addEventListener("input", () => { operatorStyle.gunColor = normalizeOperatorColor(operatorGunColorInput.value); storageSet("sgtOperatorGunColor", operatorStyle.gunColor); updateOperatorPreview(); });
 document.getElementById("resumeButton").addEventListener("click", togglePause);
 document.getElementById("restartButton").addEventListener("click", startMission);
 document.getElementById("retryButton").addEventListener("click", startMission);

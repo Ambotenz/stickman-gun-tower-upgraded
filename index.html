@@ -86,8 +86,32 @@
         <button class="choice-card" data-mode="survival" type="button"><span class="choice-icon">∞</span><strong>ENDLESS SURVIVAL</strong><small>Hold out against escalating waves.</small><em>ENDLESS // HIGH SCORE</em></button>
       </div>
       <label class="setting-row hidden" id="towerDifficultyRow"><span><strong>TOWER THREAT LEVEL</strong><small>Choose enemy speed, strength, and numbers</small></span><select id="towerDifficultySelect"><option value="easy">EASY</option><option value="normal">NORMAL</option><option value="hard">HARD</option></select></label>
+      <div id="survivalBrief" class="survival-brief hidden"><span>ENDLESS SURVIVAL</span><strong>Start easy. Survive longer as the waves grow harder.</strong></div>
       <div id="settingsRows" class="hidden"><label class="setting-row"><span><strong>SOUND</strong><small>Combat and menu sound effects</small></span><input id="soundToggle" type="checkbox" checked></label><label class="setting-row"><span><strong>SCREEN SHAKE</strong><small>Impact camera feedback</small></span><input id="shakeToggle" type="checkbox" checked></label></div>
-      <div id="operatorCustomize" class="operator-customize hidden"><label>OPERATOR CALLSIGN<input id="operatorName" maxlength="14" value="OPERATOR 01"></label><label>VISUAL MARK<select id="operatorAccessory"><option value="none">NONE</option><option value="visor">VISOR</option><option value="crown">CROWN</option><option value="bandana">BANDANA</option></select></label></div>
+      <div id="operatorCustomize" class="operator-customize hidden">
+        <div id="operatorPreview" class="operator-preview" aria-label="Live operator preview">
+          <svg viewBox="0 0 120 132" role="img" aria-label="Customized stick figure holding a gun">
+            <g transform="translate(48 80)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <g stroke="var(--preview-gun,#7ee5ff)" stroke-width="3"><path d="M13 0 32 2"/></g>
+              <g stroke="var(--preview-suit,#dff7ff)" stroke-width="4">
+                <circle cx="0" cy="-18" r="12" fill="#111015" />
+                <path d="M0-6V18M0 18-8 34M0 18 8 34" />
+              </g>
+              <path d="M0-3 8-5 17 0M0 4 9 8 17 3" fill="none" stroke="var(--preview-suit,#dff7ff)" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5" />
+              <g fill="var(--preview-suit,#dff7ff)" stroke="none"><circle cx="17" cy="0" r="3"/><circle cx="17" cy="3" r="3"/></g>
+            </g>
+            <rect id="previewVisor" x="39" y="59" width="18" height="4" rx="2" fill="#66f4ff" class="hidden" />
+            <path id="previewCrown" d="M40 50v-7l5 4 3-7 3 7 5-4v7z" fill="#ffd45d" class="hidden" />
+            <path id="previewBandana" d="M38 52h20v5H38zm18 1 9 3-2 4-9-3z" fill="#ff6464" class="hidden" />
+            <text id="operatorPreviewName" x="48" y="37" text-anchor="middle" fill="var(--preview-suit,#dff7ff)" font-family="Orbitron,sans-serif" font-size="10" font-weight="700">OPERATOR 01</text>
+          </svg>
+          <div class="operator-preview-caption"><span>DEPLOYMENT PREVIEW</span></div>
+        </div>
+        <label>OPERATOR CALLSIGN<input id="operatorName" maxlength="14" value="OPERATOR 01"></label>
+        <label>SUIT COLOR<input id="operatorColor" type="color" value="#dff7ff" aria-label="Choose operator color"></label>
+        <label>GUN COLOR<input id="operatorGunColor" type="color" value="#7ee5ff" aria-label="Choose gun color"></label>
+        <label>VISUAL MARK<select id="operatorAccessory"><option value="none">NONE</option><option value="visor">VISOR</option><option value="crown">CROWN</option><option value="bandana">BANDANA</option></select></label>
+      </div>
       <section class="mission-leaderboard"><div class="mission-leaderboard-heading">LOCAL LEADERBOARD <span id="missionLeaderboardTitle">TOWER NORMAL THREAT</span></div><div id="missionLeaderboardList" class="leaderboard-entries"></div></section>
       <div class="dialog-footer"><span id="loadoutSummary">TOWER BREACH / WEAPONS IN FIELD</span><button id="confirmDeploy" class="action-button action-primary" type="button">INITIATE DEPLOYMENT →</button></div>
     </section>
